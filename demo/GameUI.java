@@ -11,6 +11,7 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
@@ -48,16 +49,19 @@ public class GameUI {
     private final Label speakerLabel;
     private final Label dialogueLabel;
 
+    // =========================================================
+    // SCENE
+    // =========================================================
+
     private final StackPane imageArea;
-    private final ImageView imageView;
+    private final ImageView backgroundView;
+    private final ImageView characterView;
 
-    private final Button restartButton;
+    // =========================================================
+    // BOSS
+    // =========================================================
 
-    private final Label footerLabel;
-
-    // Boss UI
     private final VBox bossArea;
-
     private final Label bossNameLabel;
     private final Label playerHpLabel;
     private final Label bossHpLabel;
@@ -66,36 +70,54 @@ public class GameUI {
     private final ProgressBar bossHpBar;
 
     // =========================================================
+    // EGYÉB
+    // =========================================================
+
+    private final Button restartButton;
+    private final Label footerLabel;
+
+    // =========================================================
     // SZÍNEK
     // =========================================================
 
-    private final String BACKGROUND = "#F5F1E8";
-    private final String WHITE = "#FFFDF8";
-    private final String DARK = "#202020";
-    private final String LIGHT_BORDER = "#D6D0C4";
-    private final String RED = "#B3261E";
-    private final String RED_DARK = "#8F1D18";
-    private final String GRAY = "#777777";
-    private final String LIGHT_GRAY = "#ECE8DF";
+    private static final String PAGE_BACKGROUND = "#F1EDE3";
+    private static final String CREAM = "#F7F3E9";
+    private static final String WHITE = "#FFFDF8";
+
+    private static final String BLACK = "#111111";
+    private static final String DARK = "#191919";
+
+    private static final String RED = "#D20A2E";
+    private static final String RED_DARK = "#A80725";
+
+    private static final String GREEN = "#2F6B45";
+
+    private static final String BORDER = "#171717";
+    private static final String LIGHT_BORDER = "#C8C1B5";
+
+    private static final String GRAY = "#6D6D6D";
 
     // =========================================================
     // BETŰTÍPUSOK
     // =========================================================
 
     private final Font normalFont =
-            Font.font("Monospaced", FontWeight.NORMAL, 15);
+            Font.font("Arial", FontWeight.NORMAL, 16);
 
     private final Font smallFont =
-            Font.font("Monospaced", FontWeight.NORMAL, 12);
+            Font.font("Arial", FontWeight.NORMAL, 11);
 
     private final Font boldFont =
-            Font.font("Monospaced", FontWeight.BOLD, 14);
+            Font.font("Arial", FontWeight.BOLD, 12);
 
     private final Font titleFont =
-            Font.font("Monospaced", FontWeight.BOLD, 22);
+            Font.font("Arial", FontWeight.BOLD, 22);
 
     private final Font chapterFont =
-            Font.font("Monospaced", FontWeight.BOLD, 20);
+            Font.font("Arial", FontWeight.BOLD, 44);
+
+    private final Font dialogueFont =
+            Font.font("Arial", FontWeight.NORMAL, 18);
 
     // =========================================================
     // KONSTRUKTOR
@@ -103,61 +125,141 @@ public class GameUI {
 
     public GameUI() {
 
-        // -----------------------------------------------------
+        // =====================================================
         // ROOT
-        // -----------------------------------------------------
+        // =====================================================
 
         root = new BorderPane();
 
         root.setStyle(
-                "-fx-background-color: " + BACKGROUND + ";"
+                "-fx-background-color: " + PAGE_BACKGROUND + ";"
         );
 
-        // -----------------------------------------------------
-        // TOP BAR
-        // -----------------------------------------------------
+        // =====================================================
+        // FELSŐ RÉSZ
+        // =====================================================
 
         topBar = new VBox();
-        topBar.setPadding(new Insets(18, 30, 12, 30));
-        topBar.setSpacing(12);
+
+        topBar.setSpacing(0);
 
         topBar.setStyle(
-                "-fx-background-color: " + WHITE + ";" +
+                "-fx-background-color: " + CREAM + ";"
+        );
+
+        // =====================================================
+        // PIROS / KRÉM / ZÖLD CSÍK
+        // =====================================================
+
+        HBox colorLine = new HBox();
+
+        Region redLine = new Region();
+        Region creamLine = new Region();
+        Region greenLine = new Region();
+
+        redLine.setPrefHeight(5);
+        creamLine.setPrefHeight(5);
+        greenLine.setPrefHeight(5);
+
+        redLine.setStyle(
+                "-fx-background-color: " + RED + ";"
+        );
+
+        creamLine.setStyle(
+                "-fx-background-color: " + CREAM + ";"
+        );
+
+        greenLine.setStyle(
+                "-fx-background-color: " + GREEN + ";"
+        );
+
+        HBox.setHgrow(
+                redLine,
+                Priority.ALWAYS
+        );
+
+        HBox.setHgrow(
+                creamLine,
+                Priority.ALWAYS
+        );
+
+        HBox.setHgrow(
+                greenLine,
+                Priority.ALWAYS
+        );
+
+        colorLine.getChildren().addAll(
+                redLine,
+                creamLine,
+                greenLine
+        );
+
+        // =====================================================
+        // STATUS BAR
+        // =====================================================
+
+        HBox statusBar = new HBox();
+
+        statusBar.setAlignment(
+                Pos.CENTER_LEFT
+        );
+
+        statusBar.setSpacing(22);
+
+        statusBar.setPadding(
+                new Insets(13, 20, 13, 20)
+        );
+
+        statusBar.setStyle(
+                "-fx-background-color: " + CREAM + ";" +
                         "-fx-border-color: " + LIGHT_BORDER + ";" +
                         "-fx-border-width: 0 0 1 0;"
         );
 
-        // -----------------------------------------------------
-        // CÍM
-        // -----------------------------------------------------
+        // =====================================================
+        // JÁTÉK CÍME
+        // =====================================================
 
-        gameTitle = new Label("FITYESZ KRÓNIKA");
+        gameTitle = new Label(
+                Lang.t("ui.title")
+        );
 
         gameTitle.setFont(titleFont);
-        gameTitle.setTextFill(Color.web(DARK));
 
-        // -----------------------------------------------------
-        // STATS
-        // -----------------------------------------------------
+        gameTitle.setTextFill(
+                Color.web(BLACK)
+        );
 
-        HBox statsRow = new HBox();
-        statsRow.setSpacing(35);
-        statsRow.setAlignment(Pos.CENTER_LEFT);
+        gameTitle.setMinWidth(
+                Region.USE_PREF_SIZE
+        );
 
-        // PLAYER NAME
+        // =====================================================
+        // PLAYER
+        // =====================================================
 
-        playerNameLabel = createStatLabel("Játékos");
+        playerNameLabel = createStatLabel(
+                Lang.t("ui.player")
+        );
 
+        // =====================================================
         // XP
+        // =====================================================
 
         VBox xpBox = new VBox();
-        xpBox.setSpacing(4);
 
-        xpLabel = createStatLabel("XP 0");
+        xpBox.setSpacing(3);
+
+        xpLabel = createStatLabel(
+                Lang.t("ui.xp") + " 0"
+        );
 
         xpBar = new ProgressBar(0);
-        xpBar.setPrefWidth(150);
-        xpBar.setMaxWidth(150);
+
+        xpBar.setPrefWidth(90);
+        xpBar.setPrefHeight(7);
+
+        xpBar.setMaxWidth(90);
 
         xpBar.setStyle(
                 "-fx-accent: " + RED + ";"
@@ -168,16 +270,24 @@ public class GameUI {
                 xpBar
         );
 
-        // EXPOSURE
+        // =====================================================
+        // LEBUKÁS
+        // =====================================================
 
         VBox exposureBox = new VBox();
-        exposureBox.setSpacing(4);
 
-        exposureLabel = createStatLabel("LEBUKÁS 0/100");
+        exposureBox.setSpacing(3);
+
+        exposureLabel = createStatLabel(
+                Lang.t("ui.exposure") + " 0/100"
+        );
 
         exposureBar = new ProgressBar(0);
-        exposureBar.setPrefWidth(150);
-        exposureBar.setMaxWidth(150);
+
+        exposureBar.setPrefWidth(90);
+        exposureBar.setPrefHeight(7);
+
+        exposureBar.setMaxWidth(90);
 
         exposureBar.setStyle(
                 "-fx-accent: " + RED + ";"
@@ -188,55 +298,48 @@ public class GameUI {
                 exposureBar
         );
 
+        // =====================================================
         // LEVEL
+        // =====================================================
 
-        levelLabel = createStatLabel("SZINT 1");
+        levelLabel = createStatLabel(
+                Lang.t("ui.level") + " 1"
+        );
 
+        // =====================================================
         // ITEMS
+        // =====================================================
 
-        itemsLabel = createStatLabel("TÁRGYAK 0");
+        itemsLabel = createStatLabel(
+                Lang.t("ui.items") + " 0"
+        );
 
+        // =====================================================
         // RESTART
+        // =====================================================
 
-        restartButton = new Button("ÚJRakezdés");
+        restartButton = new Button(
+                Lang.t("ui.restart")
+        );
 
-        restartButton.setFont(smallFont);
+        restartButton.setFont(
+                Font.font("Arial", FontWeight.BOLD, 11)
+        );
 
         restartButton.setPadding(
-                new Insets(8, 15, 8, 15)
+                new Insets(7, 12, 7, 12)
         );
 
-        restartButton.setStyle(
-                "-fx-background-color: " + WHITE + ";" +
-                        "-fx-border-color: " + DARK + ";" +
-                        "-fx-border-width: 1;" +
-                        "-fx-text-fill: " + DARK + ";" +
-                        "-fx-cursor: hand;"
+        styleRestartButton(
+                restartButton
         );
 
-        restartButton.setOnMouseEntered(event ->
-                restartButton.setStyle(
-                        "-fx-background-color: " + DARK + ";" +
-                                "-fx-border-color: " + DARK + ";" +
-                                "-fx-border-width: 1;" +
-                                "-fx-text-fill: white;" +
-                                "-fx-cursor: hand;"
-                )
-        );
+        // =====================================================
+        // STATUS BAR ELEMEI
+        // =====================================================
 
-        restartButton.setOnMouseExited(event ->
-                restartButton.setStyle(
-                        "-fx-background-color: " + WHITE + ";" +
-                                "-fx-border-color: " + DARK + ";" +
-                                "-fx-border-width: 1;" +
-                                "-fx-text-fill: " + DARK + ";" +
-                                "-fx-cursor: hand;"
-                )
-        );
-
-        HBox.setHgrow(playerNameLabel, Priority.ALWAYS);
-
-        statsRow.getChildren().addAll(
+        statusBar.getChildren().addAll(
+                gameTitle,
                 playerNameLabel,
                 xpBox,
                 exposureBox,
@@ -246,111 +349,211 @@ public class GameUI {
         );
 
         topBar.getChildren().addAll(
-                gameTitle,
-                statsRow
+                colorLine,
+                statusBar
         );
 
         root.setTop(topBar);
 
-        // -----------------------------------------------------
-        // GAME CONTENT
-        // -----------------------------------------------------
+        // =====================================================
+        // JÁTÉK TARTALOM
+        // =====================================================
 
         gameContent = new VBox();
-        gameContent.setSpacing(18);
-        gameContent.setPadding(
-                new Insets(30, 40, 20, 40)
+
+        gameContent.setAlignment(
+                Pos.TOP_CENTER
         );
 
-        gameContent.setAlignment(Pos.TOP_CENTER);
+        gameContent.setSpacing(0);
 
-        // -----------------------------------------------------
-        // CHAPTER
-        // -----------------------------------------------------
+        gameContent.setFillWidth(true);
+
+        gameContent.setStyle(
+                "-fx-background-color: " + DARK + ";"
+        );
+
+        // =====================================================
+        // CHAPTER LABEL
+        // =====================================================
 
         chapterLabel = new Label();
 
-        chapterLabel.setFont(chapterFont);
-        chapterLabel.setTextFill(Color.web(DARK));
+        chapterLabel.setFont(
+                Font.font(
+                        "Arial",
+                        FontWeight.BOLD,
+                        12
+                )
+        );
 
-        chapterLabel.setWrapText(true);
+        chapterLabel.setTextFill(
+                Color.web(WHITE)
+        );
 
-        // -----------------------------------------------------
-        // IMAGE AREA
-        // -----------------------------------------------------
+        chapterLabel.setAlignment(
+                Pos.CENTER_LEFT
+        );
+
+        chapterLabel.setMaxWidth(
+                Double.MAX_VALUE
+        );
+
+        chapterLabel.setPadding(
+                new Insets(12, 20, 11, 20)
+        );
+
+        chapterLabel.setStyle(
+                "-fx-background-color: " + DARK + ";" +
+                        "-fx-border-color: " + RED + ";" +
+                        "-fx-border-width: 0 0 3 0;"
+        );
+
+        // =====================================================
+        // KÉPTERÜLET
+        // =====================================================
 
         imageArea = new StackPane();
 
-        imageArea.setMinHeight(0);
-        imageArea.setPrefHeight(300);
-        imageArea.setMaxHeight(350);
+        imageArea.setPrefHeight(500);
+        imageArea.setMinHeight(500);
+        imageArea.setMaxHeight(500);
 
-        imageArea.setStyle(
-                "-fx-background-color: " + LIGHT_GRAY + ";" +
-                        "-fx-border-color: " + LIGHT_BORDER + ";" +
-                        "-fx-border-width: 1;"
+        imageArea.setMaxWidth(
+                Double.MAX_VALUE
         );
 
-        imageView = new ImageView();
+        imageArea.setStyle(
+                "-fx-background-color: " + BLACK + ";"
+        );
 
-        imageView.setPreserveRatio(true);
-        imageView.setSmooth(true);
+        // =====================================================
+        // HÁTTÉRKÉP
+        // =====================================================
 
-        imageView.setFitWidth(700);
-        imageView.setFitHeight(330);
+        backgroundView = new ImageView();
 
-        imageArea.getChildren().add(imageView);
+        backgroundView.setPreserveRatio(true);
+        backgroundView.setSmooth(true);
+
+        backgroundView.setFitWidth(1000);
+        backgroundView.setFitHeight(500);
+
+        // =====================================================
+        // KARAKTER
+        // =====================================================
+
+        characterView = new ImageView();
+
+        characterView.setPreserveRatio(true);
+        characterView.setSmooth(true);
+
+        characterView.setFitHeight(500);
+
+        characterView.setTranslateY(45);
+
+        Rectangle characterClip =
+                new Rectangle(
+                        350,
+                        470
+                );
+
+        characterView.setClip(
+                characterClip
+        );
+
+        StackPane.setAlignment(
+                characterView,
+                Pos.BOTTOM_CENTER
+        );
+
+        imageArea.getChildren().addAll(
+                backgroundView,
+                characterView
+        );
 
         imageArea.setVisible(false);
         imageArea.setManaged(false);
 
-        // -----------------------------------------------------
-        // DIALOGUE
-        // -----------------------------------------------------
+        // =====================================================
+        // DIALOGUE TERÜLET
+        // =====================================================
 
         dialogueArea = new VBox();
+
+        dialogueArea.setAlignment(
+                Pos.TOP_LEFT
+        );
+
         dialogueArea.setSpacing(0);
 
-        dialogueArea.setMaxWidth(850);
+        dialogueArea.setMaxWidth(900);
 
+        dialogueArea.setPadding(
+                new Insets(18, 20, 10, 20)
+        );
+
+        dialogueArea.setStyle(
+                "-fx-background-color: " + DARK + ";"
+        );
+
+        // =====================================================
         // SPEAKER
+        // =====================================================
 
         speakerLabel = new Label();
 
         speakerLabel.setFont(
-                Font.font("Monospaced", FontWeight.BOLD, 14)
+                Font.font(
+                        "Arial",
+                        FontWeight.BOLD,
+                        13
+                )
         );
 
-        speakerLabel.setTextFill(Color.WHITE);
+        speakerLabel.setTextFill(
+                Color.WHITE
+        );
 
         speakerLabel.setPadding(
-                new Insets(7, 14, 7, 14)
+                new Insets(8, 14, 8, 14)
         );
 
         speakerLabel.setStyle(
                 "-fx-background-color: " + RED + ";"
         );
 
-        // DIALOGUE TEXT
+        speakerLabel.setMaxWidth(
+                Region.USE_PREF_SIZE
+        );
+
+        // =====================================================
+        // DIALOGUE SZÖVEG
+        // =====================================================
 
         dialogueLabel = new Label();
 
-        dialogueLabel.setFont(normalFont);
-        dialogueLabel.setTextFill(Color.web(DARK));
+        dialogueLabel.setFont(
+                dialogueFont
+        );
+
+        dialogueLabel.setTextFill(
+                Color.web(BLACK)
+        );
 
         dialogueLabel.setWrapText(true);
 
-        dialogueLabel.setMaxWidth(850);
+        dialogueLabel.setMaxWidth(900);
+
+        dialogueLabel.setMinHeight(105);
 
         dialogueLabel.setPadding(
-                new Insets(20)
+                new Insets(22, 25, 22, 25)
         );
 
-        dialogueLabel.setMinHeight(100);
-
         dialogueLabel.setStyle(
-                "-fx-background-color: " + WHITE + ";" +
-                        "-fx-border-color: " + LIGHT_BORDER + ";" +
+                "-fx-background-color: " + CREAM + ";" +
+                        "-fx-border-color: " + BORDER + ";" +
                         "-fx-border-width: 1;"
         );
 
@@ -359,57 +562,101 @@ public class GameUI {
                 dialogueLabel
         );
 
-        // -----------------------------------------------------
+        // =====================================================
         // CHOICES
-        // -----------------------------------------------------
+        // =====================================================
 
         choicesBox = new VBox();
 
-        choicesBox.setSpacing(10);
+        choicesBox.setAlignment(
+                Pos.CENTER
+        );
 
-        choicesBox.setMaxWidth(850);
+        choicesBox.setSpacing(8);
 
-        choicesBox.setAlignment(Pos.CENTER);
+        choicesBox.setMaxWidth(900);
 
-        // -----------------------------------------------------
+        choicesBox.setPadding(
+                new Insets(8, 20, 22, 20)
+        );
+
+        choicesBox.setStyle(
+                "-fx-background-color: " + DARK + ";"
+        );
+
+        // =====================================================
         // BOSS AREA
-        // -----------------------------------------------------
+        // =====================================================
 
         bossArea = new VBox();
 
-        bossArea.setSpacing(12);
-        bossArea.setPadding(new Insets(15));
+        bossArea.setSpacing(8);
 
-        bossArea.setMaxWidth(850);
+        bossArea.setMaxWidth(900);
+
+        bossArea.setPadding(
+                new Insets(18, 20, 18, 20)
+        );
 
         bossArea.setStyle(
-                "-fx-background-color: " + WHITE + ";" +
-                        "-fx-border-color: " + LIGHT_BORDER + ";" +
+                "-fx-background-color: " + CREAM + ";" +
+                        "-fx-border-color: " + BORDER + ";" +
                         "-fx-border-width: 1;"
         );
 
         bossNameLabel = new Label();
 
-        bossNameLabel.setFont(boldFont);
-        bossNameLabel.setTextFill(Color.web(RED));
+        bossNameLabel.setFont(
+                Font.font(
+                        "Arial",
+                        FontWeight.BOLD,
+                        17
+                )
+        );
+
+        bossNameLabel.setTextFill(
+                Color.web(RED)
+        );
 
         playerHpLabel = new Label();
-        playerHpLabel.setFont(smallFont);
+
+        playerHpLabel.setFont(
+                boldFont
+        );
+
+        playerHpLabel.setTextFill(
+                Color.web(BLACK)
+        );
 
         bossHpLabel = new Label();
-        bossHpLabel.setFont(smallFont);
+
+        bossHpLabel.setFont(
+                boldFont
+        );
+
+        bossHpLabel.setTextFill(
+                Color.web(BLACK)
+        );
 
         playerHpBar = new ProgressBar(1);
-        playerHpBar.setPrefHeight(12);
-        playerHpBar.setMaxWidth(Double.MAX_VALUE);
+
+        playerHpBar.setMaxWidth(
+                Double.MAX_VALUE
+        );
+
+        playerHpBar.setPrefHeight(10);
 
         playerHpBar.setStyle(
-                "-fx-accent: #4C8A4C;"
+                "-fx-accent: " + GREEN + ";"
         );
 
         bossHpBar = new ProgressBar(1);
-        bossHpBar.setPrefHeight(12);
-        bossHpBar.setMaxWidth(Double.MAX_VALUE);
+
+        bossHpBar.setMaxWidth(
+                Double.MAX_VALUE
+        );
+
+        bossHpBar.setPrefHeight(10);
 
         bossHpBar.setStyle(
                 "-fx-accent: " + RED + ";"
@@ -426,9 +673,9 @@ public class GameUI {
         bossArea.setVisible(false);
         bossArea.setManaged(false);
 
-        // -----------------------------------------------------
-        // GAME CONTENT
-        // -----------------------------------------------------
+        // =====================================================
+        // MINDEN A GAME CONTENT-BE
+        // =====================================================
 
         gameContent.getChildren().addAll(
                 chapterLabel,
@@ -438,80 +685,176 @@ public class GameUI {
                 choicesBox
         );
 
-        // -----------------------------------------------------
-        // SCROLL
-        // -----------------------------------------------------
+        // =====================================================
+        // SCROLLPANE
+        // =====================================================
 
-        ScrollPane scrollPane = new ScrollPane();
+        ScrollPane scrollPane =
+                new ScrollPane();
 
-        scrollPane.setContent(gameContent);
+        scrollPane.setContent(
+                gameContent
+        );
 
         scrollPane.setFitToWidth(true);
+
         scrollPane.setHbarPolicy(
                 ScrollPane.ScrollBarPolicy.NEVER
         );
 
+        scrollPane.setVbarPolicy(
+                ScrollPane.ScrollBarPolicy.AS_NEEDED
+        );
+
         scrollPane.setStyle(
-                "-fx-background-color: " + BACKGROUND + ";" +
+                "-fx-background-color: " + DARK + ";" +
                         "-fx-border-color: transparent;"
         );
 
-        root.setCenter(scrollPane);
+        root.setCenter(
+                scrollPane
+        );
 
-        // -----------------------------------------------------
+        // =====================================================
         // FOOTER
-        // -----------------------------------------------------
+        // =====================================================
 
         bottomArea = new VBox();
 
-        bottomArea.setAlignment(Pos.CENTER);
+        bottomArea.setAlignment(
+                Pos.CENTER
+        );
+
         bottomArea.setPadding(
-                new Insets(12, 20, 15, 20)
+                new Insets(10, 20, 12, 20)
         );
 
         bottomArea.setStyle(
-                "-fx-background-color: " + WHITE + ";" +
+                "-fx-background-color: " + CREAM + ";" +
                         "-fx-border-color: " + LIGHT_BORDER + ";" +
                         "-fx-border-width: 1 0 0 0;"
         );
 
         footerLabel = new Label(
-                "Fityesz Krónika · Szöveges kalandjáték"
+                Lang.t("ui.footer")
         );
 
-        footerLabel.setFont(smallFont);
-        footerLabel.setTextFill(Color.web(GRAY));
+        footerLabel.setFont(
+                smallFont
+        );
 
-        bottomArea.getChildren().add(footerLabel);
+        footerLabel.setTextFill(
+                Color.web(GRAY)
+        );
 
-        root.setBottom(bottomArea);
+        bottomArea.getChildren().add(
+                footerLabel
+        );
 
-        // -----------------------------------------------------
-        // DEFAULT VALUES
-        // -----------------------------------------------------
+        root.setBottom(
+                bottomArea
+        );
 
-        speakerLabel.setText("FITYESZ KRÓNIKA");
+        // =====================================================
+        // ALAPÉRTELMEZETT ÉRTÉKEK
+        // =====================================================
+
+        speakerLabel.setText(
+                Lang.t("ui.title")
+        );
+
         dialogueLabel.setText("");
 
-        updateStats(null);
+        chapterLabel.setText("");
+
+        playerNameLabel.setText(
+                Lang.t("ui.player")
+        );
+
+        xpLabel.setText(
+                Lang.t("ui.xp") + " 0"
+        );
+
+        exposureLabel.setText(
+                Lang.t("ui.exposure") + " 0/100"
+        );
+
+        levelLabel.setText(
+                Lang.t("ui.level") + " 1"
+        );
+
+        itemsLabel.setText(
+                Lang.t("ui.items") + " 0"
+        );
     }
 
     // =========================================================
     // STAT LABEL
     // =========================================================
 
-    private Label createStatLabel(String text) {
+    private Label createStatLabel(
+            String text
+    ) {
 
-        Label label = new Label(text);
+        Label label =
+                new Label(text);
 
-        label.setFont(boldFont);
-        label.setTextFill(Color.web(DARK));
+        label.setFont(
+                boldFont
+        );
+
+        label.setTextFill(
+                Color.web(BLACK)
+        );
 
         return label;
     }
 
     // =========================================================
-    // SHOW DIALOGUE
+    // RESTART BUTTON
+    // =========================================================
+
+    private void styleRestartButton(
+            Button button
+    ) {
+
+        button.setStyle(
+                "-fx-background-color: " + CREAM + ";" +
+                        "-fx-border-color: " + BORDER + ";" +
+                        "-fx-border-width: 1;" +
+                        "-fx-text-fill: " + BLACK + ";" +
+                        "-fx-cursor: hand;"
+        );
+
+        button.setOnMouseEntered(
+                event -> {
+
+                    button.setStyle(
+                            "-fx-background-color: " + BLACK + ";" +
+                                    "-fx-border-color: " + BLACK + ";" +
+                                    "-fx-border-width: 1;" +
+                                    "-fx-text-fill: white;" +
+                                    "-fx-cursor: hand;"
+                    );
+                }
+        );
+
+        button.setOnMouseExited(
+                event -> {
+
+                    button.setStyle(
+                            "-fx-background-color: " + CREAM + ";" +
+                                    "-fx-border-color: " + BORDER + ";" +
+                                    "-fx-border-width: 1;" +
+                                    "-fx-text-fill: " + BLACK + ";" +
+                                    "-fx-cursor: hand;"
+                    );
+                }
+        );
+    }
+
+    // =========================================================
+    // DIALOGUE MEGJELENÍTÉSE
     // =========================================================
 
     public void showDialogue(
@@ -520,112 +863,122 @@ public class GameUI {
     ) {
 
         speakerLabel.setText(
-                speaker == null ? "" : speaker
+                speaker == null
+                        ? ""
+                        : speaker
         );
 
         dialogueLabel.setText(
-                text == null ? "" : text
+                text == null
+                        ? ""
+                        : text
         );
 
+        boolean visible =
+                speaker != null &&
+                        !speaker.isBlank();
+
         speakerLabel.setVisible(
-                speaker != null && !speaker.isBlank()
+                visible
         );
 
         speakerLabel.setManaged(
-                speaker != null && !speaker.isBlank()
+                visible
         );
     }
 
     // =========================================================
-    // UPDATE STATS
+    // STATISZTIKÁK FRISSÍTÉSE
     // =========================================================
 
-    public void updateStats(GameState state) {
+    public void updateStats(
+            GameState state
+    ) {
 
-        if (state == null) {
-            playerNameLabel.setText("JÁTÉKOS");
-            xpLabel.setText("XP 0");
-            exposureLabel.setText("LEBUKÁS 0/100");
-            levelLabel.setText("SZINT 1");
-            itemsLabel.setText("TÁRGYAK 0");
+        // PLAYER
 
-            xpBar.setProgress(0);
-            exposureBar.setProgress(0);
+        if (state.getName() == null ||
+                state.getName().isBlank()) {
 
-            return;
-        }
-
-        // NAME
-
-        String name = state.getName();
-
-        if (name == null || name.isBlank()) {
-            playerNameLabel.setText("JÁTÉKOS");
-        } else {
             playerNameLabel.setText(
-                    name.toUpperCase()
+                    Lang.t("ui.player")
+            );
+
+        } else {
+
+            playerNameLabel.setText(
+                    Lang.t("ui.player")
+                            + ": "
+                            + state.getName()
             );
         }
 
         // XP
 
-        int xp = state.getXp();
-
         xpLabel.setText(
-                "XP " + xp
+                Lang.t("ui.xp")
+                        + " "
+                        + state.getXp()
         );
-
-        /*
-         * Az első szint 50 XP-nél lép szintet.
-         * Ezért 50-nél telik meg a sáv.
-         */
-
-        double xpProgress =
-                Math.min(xp / 50.0, 1.0);
-
-        xpBar.setProgress(xpProgress);
 
         // EXPOSURE
 
-        int exposure = state.getExposure();
-
         exposureLabel.setText(
-                "LEBUKÁS " + exposure + "/100"
-        );
-
-        exposureBar.setProgress(
-                exposure / 100.0
+                Lang.t("ui.exposure")
+                        + " "
+                        + state.getExposure()
+                        + "/100"
         );
 
         // LEVEL
 
         levelLabel.setText(
-                "SZINT " + state.getLevel()
+                Lang.t("ui.level")
+                        + " "
+                        + state.getLevel()
         );
 
         // ITEMS
 
-        int items = 0;
+        int itemCount = 0;
 
         if (state.hasFirstEnvelope()) {
-            items++;
+            itemCount++;
         }
 
         if (state.hasSmallEnvelope()) {
-            items++;
+            itemCount++;
         }
 
         if (state.hasLakatosFile()) {
-            items++;
+            itemCount++;
         }
 
         itemsLabel.setText(
-                "TÁRGYAK " + items
+                Lang.t("ui.items")
+                        + " "
+                        + itemCount
+        );
+
+        // XP BAR
+
+        xpBar.setProgress(
+                Math.min(
+                        state.getXp(),
+                        100
+                ) / 100.0
+        );
+
+        // EXPOSURE BAR
+
+        exposureBar.setProgress(
+                state.getExposure()
+                        / 100.0
         );
     }
 
     // =========================================================
-    // CLEAR CHOICES
+    // CHOICES TÖRLÉSE
     // =========================================================
 
     public void clearChoices() {
@@ -634,7 +987,7 @@ public class GameUI {
     }
 
     // =========================================================
-    // ADD CHOICE
+    // CHOICE HOZZÁADÁSA
     // =========================================================
 
     public void addChoice(
@@ -643,75 +996,155 @@ public class GameUI {
             Runnable action
     ) {
 
-        Button button = new Button();
+        Button button =
+                new Button();
 
         button.setText(
-                number + ".  " + text
+                number +
+                        "    " +
+                        text
         );
 
-        button.setFont(normalFont);
+        button.setFont(
+                normalFont
+        );
 
-        button.setAlignment(Pos.CENTER_LEFT);
+        button.setAlignment(
+                Pos.CENTER_LEFT
+        );
 
-        button.setMaxWidth(Double.MAX_VALUE);
+        button.setMaxWidth(
+                Double.MAX_VALUE
+        );
 
-        button.setMinHeight(50);
+        button.setMinHeight(54);
+
+        button.setPrefHeight(54);
 
         button.setPadding(
-                new Insets(12, 18, 12, 18)
+                new Insets(
+                        10,
+                        16,
+                        10,
+                        16
+                )
         );
 
-        button.setStyle(
-                "-fx-background-color: " + WHITE + ";" +
-                        "-fx-border-color: " + DARK + ";" +
-                        "-fx-border-width: 1;" +
-                        "-fx-text-fill: " + DARK + ";" +
-                        "-fx-cursor: hand;"
+        styleChoiceButton(
+                button
         );
 
-        button.setOnMouseEntered(event -> {
+        button.setOnAction(
+                event -> {
 
-            button.setStyle(
-                    "-fx-background-color: " + DARK + ";" +
-                            "-fx-border-color: " + DARK + ";" +
-                            "-fx-border-width: 1;" +
-                            "-fx-text-fill: white;" +
-                            "-fx-cursor: hand;"
-            );
-        });
+                    if (action != null) {
+                        action.run();
+                    }
+                }
+        );
 
-        button.setOnMouseExited(event -> {
-
-            button.setStyle(
-                    "-fx-background-color: " + WHITE + ";" +
-                            "-fx-border-color: " + DARK + ";" +
-                            "-fx-border-width: 1;" +
-                            "-fx-text-fill: " + DARK + ";" +
-                            "-fx-cursor: hand;"
-            );
-        });
-
-        button.setOnAction(event -> {
-
-            if (action != null) {
-                action.run();
-            }
-        });
-
-        choicesBox.getChildren().add(button);
+        choicesBox.getChildren().add(
+                button
+        );
     }
 
     // =========================================================
-    // IMAGE
+    // CHOICE BUTTON STYLE
     // =========================================================
 
-    public void showImage(String path) {
+    private void styleChoiceButton(
+            Button button
+    ) {
+
+        button.setStyle(
+                "-fx-background-color: " + CREAM + ";" +
+                        "-fx-border-color: " + BORDER + ";" +
+                        "-fx-border-width: 1;" +
+                        "-fx-text-fill: " + BLACK + ";" +
+                        "-fx-cursor: hand;"
+        );
+
+        button.setOnMouseEntered(
+                event -> {
+
+                    button.setStyle(
+                            "-fx-background-color: " + BLACK + ";" +
+                                    "-fx-border-color: " + BLACK + ";" +
+                                    "-fx-border-width: 1;" +
+                                    "-fx-text-fill: white;" +
+                                    "-fx-cursor: hand;"
+                    );
+                }
+        );
+
+        button.setOnMouseExited(
+                event -> {
+
+                    button.setStyle(
+                            "-fx-background-color: " + CREAM + ";" +
+                                    "-fx-border-color: " + BORDER + ";" +
+                                    "-fx-border-width: 1;" +
+                                    "-fx-text-fill: " + BLACK + ";" +
+                                    "-fx-cursor: hand;"
+                    );
+                }
+        );
+    }
+
+    // =========================================================
+    // HÁTTÉRKÉP MEGJELENÍTÉSE
+    // =========================================================
+
+    public void showImage(
+            String path
+    ) {
+
+        Image image =
+                loadImage(path);
+
+        if (image != null) {
+
+            backgroundView.setImage(
+                    image
+            );
+
+            imageArea.setVisible(
+                    true
+            );
+
+            imageArea.setManaged(
+                    true
+            );
+
+        } else {
+
+            backgroundView.setImage(
+                    null
+            );
+
+            imageArea.setVisible(
+                    false
+            );
+
+            imageArea.setManaged(
+                    false
+            );
+        }
+    }
+
+    // =========================================================
+    // KÉP BETÖLTÉSE
+    // =========================================================
+
+    private Image loadImage(
+            String path
+    ) {
 
         Image image = null;
 
-        // -----------------------------------------------------
-        // 1. CLASS PATH
-        // -----------------------------------------------------
+        // =====================================================
+        // CLASS PATH
+        // =====================================================
 
         try {
 
@@ -721,89 +1154,147 @@ public class GameUI {
 
             if (stream != null) {
 
-                image = new Image(stream);
+                image =
+                        new Image(stream);
             }
 
         } catch (Exception ignored) {
         }
 
-        // -----------------------------------------------------
-        // 2. CLASS PATH WITHOUT /
-        // -----------------------------------------------------
+        // =====================================================
+        // CLASS LOADER
+        // =====================================================
 
         if (image == null) {
 
             try {
+
+                String cleanPath =
+                        path.startsWith("/")
+                                ? path.substring(1)
+                                : path;
 
                 InputStream stream =
                         getClass()
                                 .getClassLoader()
                                 .getResourceAsStream(
-                                        path.startsWith("/")
-                                                ? path.substring(1)
-                                                : path
+                                        cleanPath
                                 );
 
                 if (stream != null) {
 
-                    image = new Image(stream);
+                    image =
+                            new Image(stream);
                 }
 
             } catch (Exception ignored) {
             }
         }
 
-        // -----------------------------------------------------
-        // 3. NORMAL FILE PATH
-        // -----------------------------------------------------
+        // =====================================================
+        // FILE
+        // =====================================================
 
         if (image == null) {
 
             try {
 
-                File file = new File(path);
+                File file =
+                        new File(path);
 
                 if (file.exists()) {
 
-                    image = new Image(
-                            file.toURI().toString()
-                    );
+                    image =
+                            new Image(
+                                    file.toURI()
+                                            .toString()
+                            );
                 }
 
             } catch (Exception ignored) {
             }
         }
 
-        // -----------------------------------------------------
-        // IMAGE FOUND
-        // -----------------------------------------------------
+        return image;
+    }
+
+    // =========================================================
+    // KARAKTER MEGJELENÍTÉSE
+    // =========================================================
+
+    public void showCharacter(
+            String path
+    ) {
+
+        Image image =
+                loadImage(path);
 
         if (image != null) {
 
-            imageView.setImage(image);
+            characterView.setImage(
+                    image
+            );
 
-            imageArea.setVisible(true);
-            imageArea.setManaged(true);
+            characterView.setVisible(
+                    true
+            );
+
+            characterView.setManaged(
+                    true
+            );
 
         } else {
 
-            imageView.setImage(null);
+            characterView.setImage(
+                    null
+            );
 
-            imageArea.setVisible(false);
-            imageArea.setManaged(false);
+            characterView.setVisible(
+                    false
+            );
+
+            characterView.setManaged(
+                    false
+            );
         }
     }
 
     // =========================================================
-    // HIDE IMAGE
+    // KARAKTER ELREJTÉSE
+    // =========================================================
+
+    public void hideCharacter() {
+
+        characterView.setImage(
+                null
+        );
+
+        characterView.setVisible(
+                false
+        );
+
+        characterView.setManaged(
+                false
+        );
+    }
+
+    // =========================================================
+    // HÁTTÉRKÉP ELREJTÉSE
     // =========================================================
 
     public void hideImage() {
 
-        imageView.setImage(null);
+        backgroundView.setImage(
+                null
+        );
 
-        imageArea.setVisible(false);
-        imageArea.setManaged(false);
+        imageArea.setVisible(
+                false
+        );
+
+        imageArea.setManaged(
+                false
+        );
     }
 
     // =========================================================
@@ -816,19 +1307,23 @@ public class GameUI {
             int bossHp
     ) {
 
-        bossArea.setVisible(true);
-        bossArea.setManaged(true);
+        bossArea.setVisible(
+                true
+        );
+
+        bossArea.setManaged(
+                true
+        );
 
         updateBossHp(
                 bossName,
                 playerHp,
                 bossHp
         );
-
     }
 
     // =========================================================
-    // UPDATE BOSS HP
+    // BOSS HP FRISSÍTÉSE
     // =========================================================
 
     public void updateBossHp(
@@ -837,36 +1332,34 @@ public class GameUI {
             int bossHp
     ) {
 
-        // BOSS NAME
-
         bossNameLabel.setText(
                 bossName == null
                         ? "ELLENFÉL"
                         : bossName
         );
 
-        // PLAYER HP
+        playerHp =
+                Math.max(
+                        0,
+                        Math.min(
+                                100,
+                                playerHp
+                        )
+                );
 
-        playerHp = Math.max(
-                0,
-                Math.min(100, playerHp)
-        );
+        bossHp =
+                Math.max(
+                        0,
+                        Math.min(
+                                80,
+                                bossHp
+                        )
+                );
 
         playerHpLabel.setText(
                 "JÁTÉKOS ÉLETERŐ: "
                         + playerHp
                         + " / 100"
-        );
-
-        playerHpBar.setProgress(
-                playerHp / 100.0
-        );
-
-        // BOSS HP
-
-        bossHp = Math.max(
-                0,
-                Math.min(80, bossHp)
         );
 
         bossHpLabel.setText(
@@ -875,23 +1368,51 @@ public class GameUI {
                         + " / 80"
         );
 
+        playerHpBar.setProgress(
+                playerHp / 100.0
+        );
+
         bossHpBar.setProgress(
                 bossHp / 80.0
         );
     }
 
     // =========================================================
-    // HIDE BOSS
+    // BOSS ELREJTÉSE
     // =========================================================
 
     public void hideBossFight() {
 
-        bossArea.setVisible(false);
-        bossArea.setManaged(false);
+        bossArea.setVisible(
+                false
+        );
+
+        bossArea.setManaged(
+                false
+        );
     }
 
     // =========================================================
-    // GET ROOT
+    // NYELV FRISSÍTÉSE
+    // =========================================================
+
+    public void updateLanguage() {
+
+        gameTitle.setText(
+                Lang.t("ui.title")
+        );
+
+        restartButton.setText(
+                Lang.t("ui.restart")
+        );
+
+        footerLabel.setText(
+                Lang.t("ui.footer")
+        );
+    }
+
+    // =========================================================
+    // ROOT LEKÉRÉSE
     // =========================================================
 
     public BorderPane getRoot() {
@@ -900,22 +1421,27 @@ public class GameUI {
     }
 
     // =========================================================
-    // SHOW WINDOW
+    // ABLAK MEGJELENÍTÉSE
     // =========================================================
 
-    public void show(Stage stage) {
+    public void show(
+            Stage stage
+    ) {
 
-        Scene scene = new Scene(
-                root,
-                1100,
-                750
-        );
+        Scene scene =
+                new Scene(
+                        root,
+                        1100,
+                        750
+                );
 
         stage.setTitle(
                 "Fityesz Krónika"
         );
 
-        stage.setScene(scene);
+        stage.setScene(
+                scene
+        );
 
         stage.show();
     }

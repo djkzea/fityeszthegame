@@ -102,6 +102,9 @@ public final class Lang {
         // ── Kezelofelulet / UI chrome ──────────────────────────────────────
         p("ui.title",            "FITYESZ KRÓNIKA", "THE FITYESZ CHRONICLE");
         p("ui.chapter",          "FEJEZET", "CHAPTER");
+        p("ui.player",           "JÁTÉKOS", "PLAYER");
+        p("ui.restart",          "ÚJRAKEZDÉS", "RESTART");
+        p("ui.items",            "TÁRGYAK", "ITEMS");
         p("ui.choose",           "Válassz", "Choose");
         p("ui.bossfight",        "BOSSFIGHT", "BOSSFIGHT");
         p("ui.item",             "MEGSZERZETT TÁRGY", "ITEM ACQUIRED");
@@ -120,6 +123,7 @@ public final class Lang {
         p("ui.pressfound",       "A sajtó mindent kiderített.", "The press has uncovered everything.");
         p("ui.enter",            "[ Nyomj Enter-t a folytatáshoz... ]", "[ Press Enter to continue... ]");
         p("ui.you",              "Te", "You");
+        p("ui.footer", "Fityesz Krónika · Szöveges kalandjáték", "Fityesz Chronicle · Text adventure game");
 
         // ── Szereplok / Speakers ───────────────────────────────────────────
         p("npc.unknown",         "Ismeretlen hang", "Unknown voice");

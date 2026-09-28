@@ -43,6 +43,7 @@ public class GameController {
                 "Magyar",
                 () -> {
                     Lang.set("hu");
+                    ui.updateLanguage();
                     showStartScreen();
                 }
         );
@@ -52,6 +53,7 @@ public class GameController {
                 "English",
                 () -> {
                     Lang.set("en");
+                    ui.updateLanguage();
                     showStartScreen();
                 }
         );
@@ -690,6 +692,13 @@ public class GameController {
             return;
         }
 
+        if (state.getPlayerHp() <= 0) {
+            playerDefeated();
+            return;
+        }
+
+        addBossButtons();
+
     }
 
     // ==================================================
@@ -749,14 +758,141 @@ public class GameController {
     // ==================================================
 
     private void afterLakatos() {
+        ui.hideBossFight();
         ui.clearChoices();
 
         ui.showDialogue(
-                Lang.t("npc.unknown"),
+                Lang.t("npc.lakatos"),
                 Lang.t("boss1.win") + "\n\n"
-                        + Lang.t("item.lakatosFile") + "\n\n"
-                        + Lang.t("ch4.title")
+                        + Lang.t("item.lakatosFile")
         );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter4
+        );
+    }
+
+    // ==================================================
+// CHAPTER 4 - ORSZÁGOS VÁLASZTMÁNY ÁRNYAI
+// ==================================================
+
+    private void chapter4() {
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ui.chapter"),
+                Lang.t("ch4.title")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter4Meeting
+        );
+    }
+
+    // ==================================================
+// CHAPTER 4 - STORY
+// ==================================================
+
+    private void chapter4Meeting() {
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ui.chapter"),
+                Lang.t("ch4.quote") + "\n\n"
+                        + Lang.t("ch4.place")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter4Penteri
+        );
+    }
+
+    private void chapter4Penteri() {
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.peteri"),
+                Lang.t("ch4.t1") + "\n\n"
+                        + Lang.t("ch4.t2")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter4Conversation
+        );
+    }
+
+    private void chapter4Conversation() {
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.peteri"),
+                Lang.t("ch4.peteri1") + "\n\n"
+                        + Lang.t("ch4.peteri2") + "\n\n"
+                        + Lang.t("ch4.q")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ch4.q.opt1"),
+                () -> chapter4Choice(1)
+        );
+
+        ui.addChoice(
+                2,
+                Lang.t("ch4.q.opt2"),
+                () -> chapter4Choice(2)
+        );
+
+        ui.addChoice(
+                3,
+                Lang.t("ch4.q.opt3"),
+                () -> chapter4Choice(3)
+        );
+    }
+
+    private void chapter4Choice(int choice) {
+        ui.clearChoices();
+
+        if (choice == 1) {
+
+            state.addXp(25);
+            state.addExposure(20);
+
+            ui.showDialogue(
+                    Lang.t("npc.peteri"),
+                    Lang.t("ch4.q.ans1")
+            );
+
+        } else if (choice == 2) {
+
+            state.addXp(15);
+            state.addExposure(10);
+
+            ui.showDialogue(
+                    Lang.t("npc.peteri"),
+                    Lang.t("ch4.q.ans2")
+            );
+
+        } else {
+
+            state.addXp(5);
+            state.addExposure(-5);
+
+            ui.showDialogue(
+                    Lang.t("npc.peteri"),
+                    Lang.t("ch4.q.ans3")
+            );
+        }
+
+        ui.updateStats(state);
 
         ui.addChoice(
                 1,
