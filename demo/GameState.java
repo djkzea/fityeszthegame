@@ -25,6 +25,13 @@ public class GameState {
 
     private boolean lakatosFile = false;
 
+    private boolean offshoreCode = false;
+
+    private boolean peteriDossier = false;
+
+    private boolean bossTrust = false;
+
+    private boolean parliamentKey = false;
 
     // ==========================================
     // BOSS FIGHT
@@ -150,6 +157,52 @@ public class GameState {
         lakatosFile = value;
     }
 
+    public boolean hasParliamentKey() {
+
+        return parliamentKey;
+    }
+
+
+    public void setParliamentKey(boolean value) {
+
+        parliamentKey = value;
+    }
+
+    public boolean hasOffshoreCode() {
+
+        return offshoreCode;
+    }
+
+
+    public void setOffshoreCode(boolean value) {
+
+        offshoreCode = value;
+    }
+
+
+    public boolean hasPeteriDossier() {
+
+        return peteriDossier;
+    }
+
+
+    public void setPeteriDossier(boolean value) {
+
+        peteriDossier = value;
+    }
+
+
+    public boolean hasBossTrust() {
+
+        return bossTrust;
+    }
+
+
+    public void setBossTrust(boolean value) {
+
+        bossTrust = value;
+    }
+
 
     // ==========================================
     // PLAYER HP
@@ -211,7 +264,7 @@ public class GameState {
     // RESET BOSS FIGHT
     // ==========================================
 
-    public void resetLakatosFight() {
+    public void resetBossFight() {
 
         playerHp = 100;
 

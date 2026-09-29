@@ -15,6 +15,9 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.Priority;
 
 import java.io.File;
 import java.io.InputStream;
@@ -31,7 +34,7 @@ public class GameUI {
     private final VBox gameContent;
     private final VBox dialogueArea;
     private final VBox choicesBox;
-    private final VBox bottomArea;
+
 
     private final Label gameTitle;
 
@@ -57,6 +60,7 @@ public class GameUI {
     private final ImageView backgroundView;
     private final ImageView characterView;
 
+
     // =========================================================
     // BOSS
     // =========================================================
@@ -74,7 +78,6 @@ public class GameUI {
     // =========================================================
 
     private final Button restartButton;
-    private final Label footerLabel;
 
     // =========================================================
     // SZÍNEK
@@ -117,7 +120,7 @@ public class GameUI {
             Font.font("Arial", FontWeight.BOLD, 44);
 
     private final Font dialogueFont =
-            Font.font("Arial", FontWeight.NORMAL, 18);
+            Font.font("Arial", FontWeight.NORMAL, 16);
 
     // =========================================================
     // KONSTRUKTOR
@@ -415,16 +418,21 @@ public class GameUI {
 
         imageArea = new StackPane();
 
-        imageArea.setPrefHeight(500);
-        imageArea.setMinHeight(500);
-        imageArea.setMaxHeight(500);
+        imageArea.setPrefHeight(600);
+        imageArea.setMinHeight(600);
+        imageArea.setMaxHeight(Double.MAX_VALUE);
 
-        imageArea.setMaxWidth(
-                Double.MAX_VALUE
-        );
+        imageArea.setPrefWidth(Double.MAX_VALUE);
+        imageArea.setMinWidth(0);
+        imageArea.setMaxWidth(Double.MAX_VALUE);
 
         imageArea.setStyle(
-                "-fx-background-color: " + BLACK + ";"
+                "-fx-background-color: " + PAGE_BACKGROUND + ";"
+        );
+
+        VBox.setVgrow(
+                imageArea,
+                Priority.ALWAYS
         );
 
         // =====================================================
@@ -433,11 +441,16 @@ public class GameUI {
 
         backgroundView = new ImageView();
 
-        backgroundView.setPreserveRatio(true);
+        backgroundView.setPreserveRatio(false);
         backgroundView.setSmooth(true);
 
-        backgroundView.setFitWidth(1000);
-        backgroundView.setFitHeight(500);
+        backgroundView.fitWidthProperty().bind(
+                imageArea.widthProperty()
+        );
+
+        backgroundView.fitHeightProperty().bind(
+                imageArea.heightProperty()
+        );
 
         // =====================================================
         // KARAKTER
@@ -448,7 +461,7 @@ public class GameUI {
         characterView.setPreserveRatio(true);
         characterView.setSmooth(true);
 
-        characterView.setFitHeight(500);
+        characterView.setFitHeight(650);
 
         characterView.setTranslateY(45);
 
@@ -472,8 +485,9 @@ public class GameUI {
                 characterView
         );
 
-        imageArea.setVisible(false);
-        imageArea.setManaged(false);
+
+        imageArea.setVisible(true);
+        imageArea.setManaged(true);
 
         // =====================================================
         // DIALOGUE TERÜLET
@@ -487,7 +501,8 @@ public class GameUI {
 
         dialogueArea.setSpacing(0);
 
-        dialogueArea.setMaxWidth(900);
+        dialogueArea.setMaxWidth(Double.MAX_VALUE);
+        dialogueArea.setPrefWidth(Double.MAX_VALUE);
 
         dialogueArea.setPadding(
                 new Insets(18, 20, 10, 20)
@@ -543,13 +558,11 @@ public class GameUI {
 
         dialogueLabel.setWrapText(true);
 
-        dialogueLabel.setMaxWidth(900);
+        dialogueLabel.setMaxWidth(Double.MAX_VALUE);
+        dialogueLabel.setPrefWidth(Double.MAX_VALUE);
 
-        dialogueLabel.setMinHeight(105);
-
-        dialogueLabel.setPadding(
-                new Insets(22, 25, 22, 25)
-        );
+        dialogueLabel.setMinHeight(70);
+        dialogueLabel.setPadding(new Insets(12,25,12,25));
 
         dialogueLabel.setStyle(
                 "-fx-background-color: " + CREAM + ";" +
@@ -561,6 +574,9 @@ public class GameUI {
                 speakerLabel,
                 dialogueLabel
         );
+
+        dialogueArea.setVisible(true);
+        dialogueArea.setManaged(true);
 
         // =====================================================
         // CHOICES
@@ -574,15 +590,45 @@ public class GameUI {
 
         choicesBox.setSpacing(8);
 
-        choicesBox.setMaxWidth(900);
+        choicesBox.setMaxWidth(Double.MAX_VALUE);
+        choicesBox.setPrefWidth(Double.MAX_VALUE);
 
         choicesBox.setPadding(
-                new Insets(8, 20, 22, 20)
+                new Insets(5, 20, 10, 20)
         );
 
         choicesBox.setStyle(
                 "-fx-background-color: " + DARK + ";"
         );
+
+        VBox overlay = new VBox();
+
+        overlay.setAlignment(Pos.BOTTOM_CENTER);
+        overlay.setSpacing(0);
+
+        overlay.setMaxWidth(Double.MAX_VALUE);
+        overlay.setPrefWidth(Double.MAX_VALUE);
+
+        overlay.getChildren().addAll(
+                dialogueArea,
+                choicesBox
+        );
+
+        StackPane.setAlignment(
+                overlay,
+                Pos.BOTTOM_CENTER
+        );
+
+        StackPane.setMargin(
+                overlay,
+                new Insets(0)
+        );
+
+        imageArea.getChildren().add(
+                overlay
+        );
+
+
 
         // =====================================================
         // BOSS AREA
@@ -677,83 +723,15 @@ public class GameUI {
         // MINDEN A GAME CONTENT-BE
         // =====================================================
 
-        gameContent.getChildren().addAll(
-                chapterLabel,
-                imageArea,
-                dialogueArea,
-                bossArea,
-                choicesBox
+        gameContent.getChildren().add(
+                imageArea
         );
 
         // =====================================================
         // SCROLLPANE
         // =====================================================
 
-        ScrollPane scrollPane =
-                new ScrollPane();
-
-        scrollPane.setContent(
-                gameContent
-        );
-
-        scrollPane.setFitToWidth(true);
-
-        scrollPane.setHbarPolicy(
-                ScrollPane.ScrollBarPolicy.NEVER
-        );
-
-        scrollPane.setVbarPolicy(
-                ScrollPane.ScrollBarPolicy.AS_NEEDED
-        );
-
-        scrollPane.setStyle(
-                "-fx-background-color: " + DARK + ";" +
-                        "-fx-border-color: transparent;"
-        );
-
-        root.setCenter(
-                scrollPane
-        );
-
-        // =====================================================
-        // FOOTER
-        // =====================================================
-
-        bottomArea = new VBox();
-
-        bottomArea.setAlignment(
-                Pos.CENTER
-        );
-
-        bottomArea.setPadding(
-                new Insets(10, 20, 12, 20)
-        );
-
-        bottomArea.setStyle(
-                "-fx-background-color: " + CREAM + ";" +
-                        "-fx-border-color: " + LIGHT_BORDER + ";" +
-                        "-fx-border-width: 1 0 0 0;"
-        );
-
-        footerLabel = new Label(
-                Lang.t("ui.footer")
-        );
-
-        footerLabel.setFont(
-                smallFont
-        );
-
-        footerLabel.setTextFill(
-                Color.web(GRAY)
-        );
-
-        bottomArea.getChildren().add(
-                footerLabel
-        );
-
-        root.setBottom(
-                bottomArea
-        );
+        root.setCenter(gameContent);
 
         // =====================================================
         // ALAPÉRTELMEZETT ÉRTÉKEK
@@ -857,10 +835,10 @@ public class GameUI {
     // DIALOGUE MEGJELENÍTÉSE
     // =========================================================
 
-    public void showDialogue(
-            String speaker,
-            String text
-    ) {
+    public void showDialogue(String speaker, String text) {
+
+        dialogueArea.setVisible(true);
+        dialogueArea.setManaged(true);
 
         speakerLabel.setText(
                 speaker == null
@@ -878,13 +856,9 @@ public class GameUI {
                 speaker != null &&
                         !speaker.isBlank();
 
-        speakerLabel.setVisible(
-                visible
-        );
+        speakerLabel.setVisible(visible);
 
-        speakerLabel.setManaged(
-                visible
-        );
+        speakerLabel.setManaged(visible);
     }
 
     // =========================================================
@@ -1000,9 +974,7 @@ public class GameUI {
                 new Button();
 
         button.setText(
-                number +
-                        "    " +
-                        text
+                number + "    " + text
         );
 
         button.setFont(
@@ -1017,7 +989,7 @@ public class GameUI {
                 Double.MAX_VALUE
         );
 
-        button.setMinHeight(54);
+        button.setMinHeight(40);
 
         button.setPrefHeight(54);
 
@@ -1034,18 +1006,13 @@ public class GameUI {
                 button
         );
 
-        button.setOnAction(
-                event -> {
+        button.setOnAction(e -> action.run());
 
-                    if (action != null) {
-                        action.run();
-                    }
-                }
-        );
+        if (text.equals(Lang.t("ui.enter"))) {
+            button.setId("enterButton");
+        }
 
-        choicesBox.getChildren().add(
-                button
-        );
+        choicesBox.getChildren().add(button);
     }
 
     // =========================================================
@@ -1104,32 +1071,15 @@ public class GameUI {
 
         if (image != null) {
 
-            backgroundView.setImage(
-                    image
-            );
-
-            imageArea.setVisible(
-                    true
-            );
-
-            imageArea.setManaged(
-                    true
-            );
+            backgroundView.setImage(image);
 
         } else {
 
-            backgroundView.setImage(
-                    null
-            );
-
-            imageArea.setVisible(
-                    false
-            );
-
-            imageArea.setManaged(
-                    false
-            );
+            backgroundView.setImage(null);
         }
+
+        imageArea.setVisible(true);
+        imageArea.setManaged(true);
     }
 
     // =========================================================
@@ -1284,17 +1234,10 @@ public class GameUI {
 
     public void hideImage() {
 
-        backgroundView.setImage(
-                null
-        );
+        backgroundView.setImage(null);
 
-        imageArea.setVisible(
-                false
-        );
-
-        imageArea.setManaged(
-                false
-        );
+        imageArea.setVisible(true);
+        imageArea.setManaged(true);
     }
 
     // =========================================================
@@ -1405,10 +1348,6 @@ public class GameUI {
         restartButton.setText(
                 Lang.t("ui.restart")
         );
-
-        footerLabel.setText(
-                Lang.t("ui.footer")
-        );
     }
 
     // =========================================================
@@ -1418,6 +1357,26 @@ public class GameUI {
     public BorderPane getRoot() {
 
         return root;
+    }
+
+    public VBox getChoicesBox() {
+
+        return choicesBox;
+    }
+
+    public void pressEnterButton() {
+
+        for (javafx.scene.Node node : choicesBox.getChildren()) {
+
+            if (node instanceof Button button) {
+
+                if ("enterButton".equals(button.getId())) {
+
+                    button.fire();
+                    return;
+                }
+            }
+        }
     }
 
     // =========================================================
@@ -1434,6 +1393,22 @@ public class GameUI {
                         1100,
                         750
                 );
+
+        scene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+
+            if (event.getCode() == KeyCode.ENTER) {
+
+                if (!choicesBox.getChildren().isEmpty()) {
+
+                    Button firstButton =
+                            (Button) choicesBox.getChildren().get(0);
+
+                    firstButton.fire();
+
+                    event.consume();
+                }
+            }
+        });
 
         stage.setTitle(
                 "Fityesz Krónika"

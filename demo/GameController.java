@@ -164,7 +164,10 @@ public class GameController {
         ui.clearChoices();
 
         ui.showImage(
-                "C:/Downloads/src/demo/main/resources/com/example/demo/fityesz_art/bg/ch1_cafe.png"
+                "/com/example/demo/fityesz_art/bg/ch1_cafe.png"
+        );
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/lipoti.png"
         );
 
         ui.showDialogue(
@@ -174,22 +177,37 @@ public class GameController {
                         + Lang.t("ch1.place")
         );
 
-        ui.addChoice(1, Lang.t("ui.enter"), this::lipotiIntroduction);
+        ui.addChoice(
+                1, Lang.t("ui.enter"),
+                this::lipotiIntroduction
+        );
     }
 
     private void lipotiIntroduction() {
         ui.clearChoices();
+
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/lipoti.png"
+        );
 
         ui.showDialogue(
                 Lang.t("npc.lipoti"),
                 Lang.t("ch1.lipoti1", state.getName())
         );
 
-        ui.addChoice(1, Lang.t("ui.enter"), this::lipotiOffer);
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::lipotiOffer
+        );
     }
 
     private void lipotiOffer() {
         ui.clearChoices();
+
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/lipoti2.png"
+        );
 
         ui.showDialogue(
                 Lang.t("npc.lipoti"),
@@ -351,6 +369,8 @@ public class GameController {
     private void chapter2Inside() {
         ui.clearChoices();
 
+        ui.hideCharacter();
+
         ui.showDialogue(
                 Lang.t("npc.unknown"),
                 Lang.t("ch2.narr1") + "\n\n"
@@ -486,6 +506,8 @@ public class GameController {
     private void congressCrowd() {
         ui.clearChoices();
 
+        ui.hideCharacter();
+
         ui.showDialogue(
                 Lang.t("npc.unknown"),
                 Lang.t("ch3.narr1")
@@ -508,6 +530,8 @@ public class GameController {
     private void kapzsSpeech2() {
         ui.clearChoices();
 
+        ui.hideCharacter();
+
         ui.showDialogue(
                 Lang.t("npc.unknown"),
                 Lang.t("ch3.narr2")
@@ -529,6 +553,8 @@ public class GameController {
 
     private void congressEnd() {
         ui.clearChoices();
+
+        ui.hideCharacter();
 
         ui.showDialogue(
                 Lang.t("npc.unknown"),
@@ -564,7 +590,7 @@ public class GameController {
     // ==================================================
 
     private void startLakatosBoss() {
-        state.resetLakatosFight();
+        state.resetBossFight();
 
         previousMove = 0;
         sameMove = 0;
@@ -684,11 +710,6 @@ public class GameController {
 
         if (state.getBossHp() <= 0) {
             lakatosDefeated();
-            return;
-        }
-
-        if (state.getPlayerHp() <= 0) {
-            playerDefeated();
             return;
         }
 
@@ -858,18 +879,23 @@ public class GameController {
         );
     }
 
+
     private void chapter4Choice(int choice) {
+
         ui.clearChoices();
 
         if (choice == 1) {
 
             state.addXp(25);
             state.addExposure(20);
+            state.setOffshoreCode(true);
 
             ui.showDialogue(
-                    Lang.t("npc.peteri"),
+                    Lang.t("npc.unknown"),
                     Lang.t("ch4.q.ans1")
             );
+
+            ui.updateStats(state);
 
         } else if (choice == 2) {
 
@@ -877,18 +903,143 @@ public class GameController {
             state.addExposure(10);
 
             ui.showDialogue(
-                    Lang.t("npc.peteri"),
+                    Lang.t("npc.unknown"),
                     Lang.t("ch4.q.ans2")
             );
 
-        } else {
+            ui.updateStats(state);
+
+        } else if (choice == 3) {
 
             state.addXp(5);
             state.addExposure(-5);
 
             ui.showDialogue(
-                    Lang.t("npc.peteri"),
+                    Lang.t("npc.unknown"),
                     Lang.t("ch4.q.ans3")
+            );
+
+            ui.updateStats(state);
+        }
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter5
+        );
+    }
+
+    private void chapter5() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.unknown"),
+                Lang.t("ch5.t1")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter5Story
+        );
+    }
+
+    private void chapter5Story() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.unknown"),
+                Lang.t("ch5.t2")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter5Molnar
+        );
+    }
+
+    private void chapter5Molnar() {
+
+        ui.clearChoices();
+
+
+
+        ui.showDialogue(
+                Lang.t("ch5.molnar1"),
+                Lang.t("ch5.narr1")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter5Conversation
+        );
+    }
+
+    private void chapter5Conversation() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ch5.molnar2"),
+                Lang.t("ch5.q")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ch5.q.opt1"),
+                () -> chapter5Choice(1)
+        );
+
+        ui.addChoice(
+                2,
+                Lang.t("ch5.q.opt2"),
+                () -> chapter5Choice(2)
+        );
+
+        ui.addChoice(
+                3,
+                Lang.t("ch5.q.opt3"),
+                () -> chapter5Choice(3)
+        );
+    }
+
+    private void chapter5Choice(int choice) {
+
+        ui.clearChoices();
+
+        if (choice == 1) {
+
+            state.addXp(25);
+            state.addExposure(20);
+            state.setParliamentKey(true);
+
+            ui.showDialogue(
+                    Lang.t("npc.unknown"),
+                    Lang.t("ch5.q.ans1")
+            );
+
+        } else if (choice == 2) {
+
+            state.addXp(10);
+            state.addExposure(10);
+
+            ui.showDialogue(
+                    Lang.t("npc.unknown"),
+                    Lang.t("ch5.q.ans2")
+            );
+
+        } else if (choice == 3) {
+
+            state.addXp(15);
+            state.addExposure(-5);
+
+            ui.showDialogue(
+                    Lang.t("npc.unknown"),
+                    Lang.t("ch5.q.ans3")
             );
         }
 
@@ -897,10 +1048,653 @@ public class GameController {
         ui.addChoice(
                 1,
                 Lang.t("ui.enter"),
+                this::chapter5Preparation
+        );
+    }
+
+    private void chapter5Preparation() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.unknown"),
+                Lang.t("ch5.pre1")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::boss2Introduction
+        );
+    }
+
+    private void boss2Introduction() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.unknown"),
+                Lang.t("ch5.pre2")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::startPeteriBoss
+        );
+    }
+
+    private void startPeteriBoss() {
+
+        state.resetBossFight();
+
+        previousMove = 0;
+        sameMove = 0;
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.peteri"),
+                Lang.t("boss2.rule1") + "\n\n"
+                        + Lang.t("boss2.rule2")
+        );
+
+        ui.showBossFight(
+                Lang.t("npc.peteri"),
+                state.getPlayerHp(),
+                state.getBossHp()
+        );
+
+        addPeteriBossButtons();
+    }
+
+    private void addPeteriBossButtons() {
+
+        ui.clearChoices();
+
+        ui.showBossFight(
+                Lang.t("npc.peteri"),
+                state.getPlayerHp(),
+                state.getBossHp()
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("fight.attack"),
+                () -> peteriBossMove(1)
+        );
+
+        ui.addChoice(
+                2,
+                Lang.t("fight.defend"),
+                () -> peteriBossMove(2)
+        );
+    }
+
+    private void peteriBossMove(int playerMove) {
+
+        int bossMove = random.nextInt(2) + 1;
+
+        String result;
+
+        if (playerMove == 1) {
+
+            if (bossMove == 1) {
+
+                state.setPlayerHp(
+                        state.getPlayerHp() - 10
+                );
+
+                state.setBossHp(
+                        state.getBossHp() - 20
+                );
+
+                result = Lang.t("fight.bothAttacked");
+
+            } else {
+
+                state.setBossHp(
+                        state.getBossHp() - 20
+                );
+
+                result = Lang.t("boss2.hit");
+            }
+
+        } else {
+
+            if (bossMove == 1) {
+
+                result = Lang.t("boss2.blocked");
+
+            } else {
+
+                result = Lang.t("fight.bothDefended");
+            }
+        }
+
+        ui.updateBossHp(
+                Lang.t("npc.peteri"),
+                state.getPlayerHp(),
+                state.getBossHp()
+        );
+
+        ui.showDialogue(
+                Lang.t("npc.peteri"),
+                result
+        );
+
+        if (state.getBossHp() <= 0) {
+
+            peteriDefeated();
+            return;
+        }
+
+        if (state.getPlayerHp() <= 0) {
+
+            playerDefeatedPeteri();
+            return;
+        }
+
+        addPeteriBossButtons();
+    }
+
+    private void playerDefeatedPeteri() {
+
+        ui.hideBossFight();
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ui.title"),
+                Lang.t("ui.defeat")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("fight.retry"),
+                this::startPeteriBoss
+        );
+
+        ui.addChoice(
+                2,
+                Lang.t("fight.quit"),
+                this::showStartScreen
+        );
+    }
+
+    private void peteriDefeated() {
+
+        ui.hideBossFight();
+
+        state.addXp(80);
+        state.setPeteriDossier(true);
+
+        ui.updateStats(state);
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.peteri"),
+                Lang.t("boss2.win") + "\n\n"
+                        + Lang.t("item.peteriDossier")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter6
+        );
+    }
+
+    private void chapter6() {
+
+        ui.hideBossFight();
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ui.chapter"),
+                Lang.t("ch6.title") + "\n\n"
+                        + Lang.t("ch6.quote")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter6Story
+        );
+    }
+
+    private void chapter6Story() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ch6.place"),
+                Lang.t("ch6.t1") + "\n\n"
+                        + Lang.t("ch6.t2")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::kapzsIntroduction
+        );
+    }
+
+    private void kapzsIntroduction() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.kapzs"),
+                Lang.t("ch6.kapzs1")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::kapzsConversation
+        );
+    }
+
+    private void kapzsConversation() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.kapzs"),
+                Lang.t("ch6.kapzs2")
+        );
+
+        ui.showDialogue(
+                Lang.t("ui.title"),
+                Lang.t("ch6.narr2")
+        );
+
+        ui.showDialogue(
+                Lang.t("npc.kapzs"),
+                Lang.t("ch6.kapzs3")
+        );
+
+        ui.showDialogue(
+                Lang.t("ui.title"),
+                Lang.t("ch6.q")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ch6.q.opt1"),
+                () -> chapter6Choice(1)
+        );
+
+        ui.addChoice(
+                2,
+                Lang.t("ch6.q.opt2"),
+                () -> chapter6Choice(2)
+        );
+
+        ui.addChoice(
+                3,
+                Lang.t("ch6.q.opt3"),
+                () -> chapter6Choice(3)
+        );
+    }
+
+    private void chapter6Choice(int choice) {
+
+        ui.clearChoices();
+
+        if (choice == 1) {
+
+            state.addXp(30);
+            state.addExposure(15);
+            state.setBossTrust(true);
+
+            ui.showDialogue(
+                    Lang.t("ui.title"),
+                    Lang.t("ch6.q.ans1")
+            );
+
+        } else if (choice == 2) {
+
+            state.addXp(20);
+            state.addExposure(5);
+            state.setBossTrust(true);
+
+            ui.showDialogue(
+                    Lang.t("ui.title"),
+                    Lang.t("ch6.q.ans2")
+            );
+
+        } else {
+
+            state.addXp(10);
+            state.addExposure(-5);
+
+            ui.showDialogue(
+                    Lang.t("ui.title"),
+                    Lang.t("ch6.q.ans3")
+            );
+        }
+
+        ui.updateStats(state);
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter7
+        );
+    }
+
+    private void chapter7() {
+
+        ui.hideBossFight();
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ui.chapter"),
+                Lang.t("ch7.title") + "\n\n"
+                        + Lang.t("ch7.quote")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter7Story
+        );
+    }
+
+    private void chapter7Story() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ch7.place"),
+                Lang.t("ch7.narr1")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::kapzsChapter7
+        );
+    }
+
+    private void kapzsChapter7() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.kapzs"),
+                Lang.t("ch7.kapzs1")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::chapter7Conversation
+        );
+    }
+
+    private void chapter7Conversation() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.kapzs"),
+                Lang.t("ch7.kapzs2")
+        );
+
+        ui.showDialogue(
+                Lang.t("ui.title"),
+                Lang.t("ch7.narr2")
+        );
+
+        ui.showDialogue(
+                Lang.t("npc.kapzs"),
+                Lang.t("ch7.kapzs3")
+        );
+
+        ui.showDialogue(
+                Lang.t("ui.title"),
+                Lang.t("ch7.q")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ch7.q.opt1"),
+                () -> chapter7Choice(1)
+        );
+
+        ui.addChoice(
+                2,
+                Lang.t("ch7.q.opt2"),
+                () -> chapter7Choice(2)
+        );
+
+        ui.addChoice(
+                3,
+                Lang.t("ch7.q.opt3"),
+                () -> chapter7Choice(3)
+        );
+    }
+
+    private void chapter7Choice(int choice) {
+
+        ui.clearChoices();
+
+        if (choice == 1) {
+
+            state.addXp(30);
+            state.addExposure(20);
+
+            ui.showDialogue(
+                    Lang.t("ui.title"),
+                    Lang.t("ch7.q.ans1")
+            );
+
+        } else if (choice == 2) {
+
+            state.addXp(20);
+            state.addExposure(10);
+
+            ui.showDialogue(
+                    Lang.t("ui.title"),
+                    Lang.t("ch7.q.ans2")
+            );
+
+        } else {
+
+            state.addXp(10);
+            state.addExposure(-5);
+
+            ui.showDialogue(
+                    Lang.t("ui.title"),
+                    Lang.t("ch7.q.ans3")
+            );
+        }
+
+        ui.updateStats(state);
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::boss3Introduction
+        );
+    }
+
+
+
+    private void boss3Introduction() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("boss3.place"),
+                Lang.t("boss3.narr")
+        );
+
+        ui.showDialogue(
+                Lang.t("npc.kapzs"),
+                Lang.t("boss3.header")
+        );
+
+        ui.showDialogue(
+                Lang.t("ui.title"),
+                Lang.t("boss3.rule1") + "\n\n"
+                        + Lang.t("boss3.rule2") + "\n\n"
+                        + Lang.t("boss3.rule3")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::startBoss3
+        );
+    }
+
+    private void startBoss3() {
+
+        state.resetBossFight();
+
+        ui.clearChoices();
+
+        ui.updateBossHp(
+                Lang.t("npc.kapzs"),
+                state.getPlayerHp(),
+                state.getBossHp()
+        );
+
+        addBoss3Buttons();
+    }
+
+    private void addBoss3Buttons() {
+
+        ui.clearChoices();
+
+        ui.addChoice(
+                1,
+                Lang.t("fight.attack"),
+                () -> boss3Move(1)
+        );
+
+        ui.addChoice(
+                2,
+                Lang.t("fight.defend"),
+                () -> boss3Move(2)
+        );
+    }
+
+    private void boss3Move(int playerMove) {
+
+        int bossMove = random.nextInt(2) + 1;
+
+        String result;
+
+        if (playerMove == 1) {
+
+            state.setBossHp(state.getBossHp() - 20);
+
+            if (bossMove == 1) {
+
+                int damage = 10;
+
+                if (state.getBossHp() < 50) {
+                    damage = 20;
+                }
+
+                if (state.hasBossTrust()) {
+                    damage = (int) (damage * 0.7);
+                }
+
+                state.setPlayerHp(
+                        state.getPlayerHp() - damage
+                );
+
+                result = Lang.t("fight.bothAttacked");
+
+            } else {
+
+                result = Lang.t("boss3.hit");
+            }
+
+        } else {
+
+            if (bossMove == 1) {
+
+                result = Lang.t("boss3.blocked");
+
+            } else {
+
+                result = Lang.t("fight.bothDefended");
+            }
+        }
+
+        ui.updateBossHp(
+                Lang.t("npc.kapzs"),
+                state.getPlayerHp(),
+                state.getBossHp()
+        );
+
+        ui.showDialogue(
+                Lang.t("npc.kapzs"),
+                result
+        );
+
+        if (state.getBossHp() <= 0) {
+            boss3Defeated();
+            return;
+        }
+
+        if (state.getPlayerHp() <= 0) {
+            playerDefeatedBoss3();
+            return;
+        }
+
+        addBoss3Buttons();
+    }
+
+    private void boss3Defeated() {
+
+        ui.hideBossFight();
+        ui.clearChoices();
+
+        state.addXp(100);
+
+        ui.updateStats(state);
+
+        ui.showDialogue(
+                Lang.t("npc.kapzs"),
+                Lang.t("boss3.win")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
                 this::endDemo
         );
     }
 
+    private void playerDefeatedBoss3() {
+
+        ui.hideBossFight();
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ui.title"),
+                Lang.t("ui.defeat")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("fight.retry"),
+                this::startBoss3
+        );
+
+        ui.addChoice(
+                2,
+                Lang.t("fight.quit"),
+                this::showStartScreen
+        );
+    }
     // ==================================================
     // TEMPORARY END
     // ==================================================
@@ -910,7 +1704,56 @@ public class GameController {
 
         ui.showDialogue(
                 Lang.t("ui.title"),
-                Lang.t("fight.gameover")
+                Lang.t("end.narr1")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::endingScene
+        );
+    }
+
+    private void endingScene() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("ui.title"),
+                Lang.t("end.t1")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::endingPlayer
+        );
+    }
+
+    private void endingPlayer() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.you"),
+                Lang.t("end.you1")
+        );
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                this::endingFinal
+        );
+    }
+
+    private void endingFinal() {
+
+        ui.clearChoices();
+
+        ui.showDialogue(
+                Lang.t("npc.unknown"),
+                Lang.t("end.narr2") + "\n\n"
+                        + Lang.t("end.unknown")
         );
 
         ui.addChoice(
