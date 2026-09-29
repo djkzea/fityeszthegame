@@ -461,14 +461,14 @@ public class GameUI {
         characterView.setPreserveRatio(true);
         characterView.setSmooth(true);
 
-        characterView.setFitHeight(650);
+        characterView.setFitHeight(790);
 
         characterView.setTranslateY(45);
 
         Rectangle characterClip =
                 new Rectangle(
-                        350,
-                        470
+                        455,
+                        611
                 );
 
         characterView.setClip(
