@@ -373,7 +373,7 @@ public class GameUI {
         gameContent.setFillWidth(true);
 
         gameContent.setStyle(
-                "-fx-background-color: " + DARK + ";"
+                "-fx-background-color: " + PAGE_BACKGROUND + ";"
         );
 
         // =====================================================
@@ -505,7 +505,7 @@ public class GameUI {
         dialogueArea.setPrefWidth(Double.MAX_VALUE);
 
         dialogueArea.setPadding(
-                new Insets(18, 20, 10, 20)
+                new Insets(8, 0, 5, 0) //18, 20, 10, 20
         );
 
         dialogueArea.setStyle(
@@ -605,8 +605,8 @@ public class GameUI {
 
         overlay.setAlignment(Pos.BOTTOM_CENTER);
         overlay.setSpacing(0);
-
         overlay.setMaxWidth(Double.MAX_VALUE);
+        overlay.setPrefWidth(Double.MAX_VALUE);
         overlay.setPrefWidth(Double.MAX_VALUE);
 
         overlay.getChildren().addAll(
@@ -718,6 +718,8 @@ public class GameUI {
 
         bossArea.setVisible(false);
         bossArea.setManaged(false);
+
+        overlay.getChildren().add(0, bossArea);
 
         // =====================================================
         // MINDEN A GAME CONTENT-BE

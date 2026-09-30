@@ -356,6 +356,11 @@ public class GameController {
     private void chapter2() {
         ui.clearChoices();
 
+        ui.showImage(
+                "/com/example/demo/fityesz_art/bg/ch2_hall.png"
+        );
+        ui.hideCharacter();
+
         ui.showDialogue(
                 Lang.t("ui.chapter"),
                 Lang.t("ch2.title") + "\n\n"
@@ -382,6 +387,8 @@ public class GameController {
 
     private void lakatosIntroduction() {
         ui.clearChoices();
+
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatos.png");
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
@@ -470,6 +477,9 @@ public class GameController {
     private void chapter3() {
         ui.clearChoices();
 
+        ui.showImage("/com/example/demo/fityesz_art/bg/ch3_congress.png");
+        ui.hideCharacter();
+
         ui.showDialogue(
                 Lang.t("ui.chapter"),
                 Lang.t("ch3.title") + "\n\n"
@@ -519,6 +529,9 @@ public class GameController {
     private void kapzsSpeech1() {
         ui.clearChoices();
 
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre.png");
+
+
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
                 Lang.t("ch3.kapzs1")
@@ -542,6 +555,10 @@ public class GameController {
 
     private void kapzsSpeech3() {
         ui.clearChoices();
+
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/kapzsimre.png"
+        );
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
@@ -596,6 +613,10 @@ public class GameController {
         sameMove = 0;
 
         ui.clearChoices();
+
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/lakatoservin.png"
+        );
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
@@ -855,7 +876,7 @@ public class GameController {
 
         ui.showDialogue(
                 Lang.t("npc.peteri"),
-                Lang.t("ch4.peteri1") + "\n\n"
+                Lang.t("ch4.peteri1", state.getName()) + "\n\n"
                         + Lang.t("ch4.peteri2") + "\n\n"
                         + Lang.t("ch4.q")
         );
@@ -968,8 +989,8 @@ public class GameController {
 
 
         ui.showDialogue(
-                Lang.t("ch5.molnar1"),
-                Lang.t("ch5.narr1")
+                Lang.t("npc.molnar"),
+                Lang.t("ch5.molnar1", state.getName()) + "\n\n" + Lang.t("ch5.narr1")
         );
 
         ui.addChoice(
@@ -984,8 +1005,9 @@ public class GameController {
         ui.clearChoices();
 
         ui.showDialogue(
-                Lang.t("ch5.molnar2"),
-                Lang.t("ch5.q")
+                Lang.t("npc.molnar"),
+                Lang.t("ch5.molnar2") + "\n\n"
+                        + Lang.t("ch5.q")
         );
 
         ui.addChoice(
@@ -1029,7 +1051,7 @@ public class GameController {
 
             ui.showDialogue(
                     Lang.t("npc.unknown"),
-                    Lang.t("ch5.q.ans2")
+                    Lang.t("ch5.q.ans2", state.getName())
             );
 
         } else if (choice == 3) {
@@ -1285,7 +1307,7 @@ public class GameController {
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
-                Lang.t("ch6.kapzs1")
+                Lang.t("ch6.kapzs1", state.getName())
         );
 
         ui.addChoice(
@@ -1311,7 +1333,7 @@ public class GameController {
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
-                Lang.t("ch6.kapzs3")
+                Lang.t("ch6.kapzs3", state.getName())
         );
 
         ui.showDialogue(
@@ -1424,7 +1446,7 @@ public class GameController {
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
-                Lang.t("ch7.kapzs1")
+                Lang.t("ch7.kapzs1", state.getName())
         );
 
         ui.addChoice(
@@ -1450,7 +1472,7 @@ public class GameController {
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
-                Lang.t("ch7.kapzs3")
+                Lang.t("ch7.kapzs3", state.getName())
         );
 
         ui.showDialogue(
@@ -1557,7 +1579,7 @@ public class GameController {
 
         ui.clearChoices();
 
-        ui.updateBossHp(
+        ui.showBossFight(
                 Lang.t("npc.kapzs"),
                 state.getPlayerHp(),
                 state.getBossHp()
@@ -1704,7 +1726,7 @@ public class GameController {
 
         ui.showDialogue(
                 Lang.t("ui.title"),
-                Lang.t("end.narr1")
+                Lang.t("end.narr1", state.getName())
         );
 
         ui.addChoice(

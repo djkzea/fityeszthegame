@@ -460,6 +460,8 @@ public final class Lang {
         p("boss3.heal",          "Kapzs gyógyult! +50 HP", "Kapzs healed! +50 HP");
         p("boss3.blocked",       "Kapzs kivédte.", "Kapzs blocked it.");
         p("boss3.hit",           "Kapzs megütött! -%s HP", "Kapzs hit you! -%s HP");
+        p("boss3.hit",           "Kapzs megütött! -%s HP", "Kapzs hit you! -%s HP");
+        p("boss3.win",           "Legyőzted Kapzs Imrét!", "You defeated Kapzs Imre!");
 
         // ── Befejezes / Ending ─────────────────────────────────────────────
         p("end.narr1",           "Kapzs Imre \"egészségügyi okokból\" visszavonult. A párt új elnöke: %s. Te.",
