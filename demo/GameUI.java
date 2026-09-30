@@ -158,6 +158,10 @@ public class GameUI {
     private final ImageView backgroundView;
     private final Label ghostLabel;
     private final ImageView characterView;
+    private String characterPose1;
+    private String characterPose2;
+    private boolean secondCharacterPose = false;
+    private boolean characterDialogueStarted = false;
     private final HBox locationStrip;
     private final Label locationLabel;
     private final VBox characterTag;
@@ -177,6 +181,7 @@ public class GameUI {
     private final VBox choicesPanel;
     private final Label choicePromptLabel;
     private final Label chooseCountLabel;
+    private final HBox choiceHeader;
     private final VBox choicesBox;
 
     // title card
@@ -507,7 +512,7 @@ public class GameUI {
         Region choiceSpacer = new Region();
         HBox.setHgrow(choiceSpacer, Priority.ALWAYS);
 
-        HBox choiceHeader = new HBox(choicePromptLabel, choiceSpacer, chooseCountLabel);
+        choiceHeader = new HBox(choicePromptLabel, choiceSpacer, chooseCountLabel);
         choiceHeader.setAlignment(Pos.CENTER_LEFT);
 
         choicesBox = new VBox(10);
@@ -547,9 +552,18 @@ public class GameUI {
         abilitiesBox.setPadding(new Insets(12, 0, 0, 0));
         setShown(abilitiesBox, false);
 
-        bossArea = new VBox(6, bossNameLabel, playerHpLabel, playerHpBar, bossHpLabel, bossHpBar, abilitiesBox);
-        bossArea.setPadding(new Insets(16, 22, 18, 22));
-        bossArea.setMaxWidth(640);
+        VBox playerHpColumn = new VBox(4, playerHpLabel, playerHpBar);
+        VBox bossHpColumn = new VBox(4, bossHpLabel, bossHpBar);
+        HBox.setHgrow(playerHpColumn, Priority.ALWAYS);
+        HBox.setHgrow(bossHpColumn, Priority.ALWAYS);
+        playerHpColumn.setMaxWidth(Double.MAX_VALUE);
+        bossHpColumn.setMaxWidth(Double.MAX_VALUE);
+
+        HBox hpRow = new HBox(20, playerHpColumn, bossHpColumn);
+
+        bossArea = new VBox(6, bossNameLabel, hpRow, abilitiesBox);
+        bossArea.setPadding(new Insets(12, 22, 14, 22));
+        bossArea.setMaxWidth(720);
         bossArea.setStyle(
                 "-fx-background-color: " + PAPER + ";" +
                         "-fx-border-color: " + INK + ";" +
@@ -566,6 +580,10 @@ public class GameUI {
         overlay.setPadding(new Insets(0, 34, 26, 34));
         overlay.setMaxWidth(Double.MAX_VALUE);
         overlay.setPickOnBounds(false);
+        overlay.setMinHeight(Region.USE_PREF_SIZE);
+        bossArea.setMinHeight(Region.USE_PREF_SIZE);
+        dialogueWrap.setMinHeight(Region.USE_PREF_SIZE);
+        choicesPanel.setMinHeight(Region.USE_PREF_SIZE);
         StackPane.setAlignment(overlay, Pos.BOTTOM_CENTER);
 
         // -----------------------------------------------------
@@ -903,6 +921,19 @@ public class GameUI {
         }
 
         boolean panel = !card && !enterMode && hasChoices && !typingActive;
+
+        // Compact layout during boss fights so everything fits on screen
+        boolean compact = bossArea.isVisible();
+
+        dialogueBox.setMinHeight(compact ? 92 : 127);
+        setShown(choiceHeader, !compact || !choicePromptLabel.getText().isEmpty());
+        choicesPanel.setPadding(compact ? new Insets(14, 26, 16, 26) : new Insets(20, 26, 24, 26));
+
+        for (Node n : choicesBox.getChildren()) {
+            if (n instanceof Button b) {
+                b.setMinHeight(compact ? 44 : 52);
+            }
+        }
 
         setShown(choicePromptLabel, !choicePromptLabel.getText().isEmpty());
         chooseCountLabel.setText(
@@ -1407,6 +1438,7 @@ public class GameUI {
     public void showBossFight(String bossName, int playerHp, int bossHp) {
         setShown(bossArea, true);
         updateBossHp(bossName, playerHp, bossHp);
+        refreshLayout();
     }
 
     public void updateBossHp(String bossName, int playerHp, int bossHp) {
@@ -1430,6 +1462,7 @@ public class GameUI {
     public void hideBossFight() {
         setShown(bossArea, false);
         clearBossAbilities();
+        refreshLayout();
     }
 
     /** Removes all ability rows. Call before adding the abilities of a new fight. */
