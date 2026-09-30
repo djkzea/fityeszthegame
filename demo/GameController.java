@@ -167,7 +167,9 @@ public class GameController {
                 "/com/example/demo/fityesz_art/bg/ch1_cafe.png"
         );
         ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/lipoti.png"
+                "/com/example/demo/fityesz_art/characters/lipoti.png",
+                Lang.t("npc.lipoti"),
+                Lang.t("npc.lipoti.role")
         );
 
         ui.showDialogue(
@@ -190,9 +192,10 @@ public class GameController {
                 "/com/example/demo/fityesz_art/characters/lipoti.png"
         );
 
-        ui.showDialogue(
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/lipoti.png",
                 Lang.t("npc.lipoti"),
-                Lang.t("ch1.lipoti1", state.getName())
+                Lang.t("npc.lipoti.role")
         );
 
         ui.addChoice(
@@ -206,7 +209,9 @@ public class GameController {
         ui.clearChoices();
 
         ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/lipoti2.png"
+                "/com/example/demo/fityesz_art/characters/lipoti2.png",
+                Lang.t("npc.lipoti"),
+                Lang.t("npc.lipoti.role")
         );
 
         ui.showDialogue(
@@ -614,6 +619,9 @@ public class GameController {
 
         ui.clearChoices();
 
+        ui.clearBossAbilities();
+        ui.addBossAbility(Lang.t("boss1.skill"), Lang.t("boss1.ab.desc"));
+
         ui.showCharacter(
                 "/com/example/demo/fityesz_art/characters/lakatoservin.png"
         );
@@ -775,7 +783,9 @@ public class GameController {
     // ==================================================
 
     private void playerDefeated() {
+        ui.hideBossFight();
         ui.clearChoices();
+        ui.hideCharacter();
 
         ui.showDialogue(
                 Lang.t("ui.title"),
@@ -954,6 +964,11 @@ public class GameController {
 
         ui.clearChoices();
 
+        ui.showImage(
+                "/com/example/demo/fityesz_art/bg/ch5_parliament.png"
+        );
+        ui.hideCharacter();
+
         ui.showDialogue(
                 Lang.t("npc.unknown"),
                 Lang.t("ch5.t1")
@@ -986,6 +1001,9 @@ public class GameController {
 
         ui.clearChoices();
 
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/molnar.png"
+        );
 
 
         ui.showDialogue(
@@ -1032,6 +1050,7 @@ public class GameController {
     private void chapter5Choice(int choice) {
 
         ui.clearChoices();
+        ui.hideCharacter();
 
         if (choice == 1) {
 
@@ -1115,10 +1134,17 @@ public class GameController {
 
         ui.clearChoices();
 
+        ui.clearBossAbilities();
+        ui.addBossAbility(Lang.t("boss2.skill"), Lang.t("boss2.ab.desc"));
+
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/peteri.png"
+        );
+
         ui.showDialogue(
                 Lang.t("npc.peteri"),
-                Lang.t("boss2.rule1") + "\n\n"
-                        + Lang.t("boss2.rule2")
+                Lang.t("boss2.skill") + "\n\n"
+                        + Lang.t("boss2.ab.desc")
         );
 
         ui.showBossFight(
@@ -1224,6 +1250,7 @@ public class GameController {
 
         ui.hideBossFight();
         ui.clearChoices();
+        ui.hideCharacter();
 
         ui.showDialogue(
                 Lang.t("ui.title"),
@@ -1271,6 +1298,11 @@ public class GameController {
         ui.hideBossFight();
         ui.clearChoices();
 
+        ui.showImage(
+                "/com/example/demo/fityesz_art/bg/ch6_office.png"
+        );
+        ui.hideCharacter();
+
         ui.showDialogue(
                 Lang.t("ui.chapter"),
                 Lang.t("ch6.title") + "\n\n"
@@ -1304,6 +1336,10 @@ public class GameController {
     private void kapzsIntroduction() {
 
         ui.clearChoices();
+
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/kapzs.png"
+        );
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
@@ -1363,6 +1399,7 @@ public class GameController {
     private void chapter6Choice(int choice) {
 
         ui.clearChoices();
+        ui.hideCharacter();
 
         if (choice == 1) {
 
@@ -1411,6 +1448,11 @@ public class GameController {
         ui.hideBossFight();
         ui.clearChoices();
 
+        ui.showImage(
+                "/com/example/demo/fityesz_art/bg/ch7_office_night.png"
+        );
+        ui.hideCharacter();
+
         ui.showDialogue(
                 Lang.t("ui.chapter"),
                 Lang.t("ch7.title") + "\n\n"
@@ -1443,6 +1485,9 @@ public class GameController {
     private void kapzsChapter7() {
 
         ui.clearChoices();
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/kapzsimre2.png"
+        );
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
@@ -1502,6 +1547,8 @@ public class GameController {
     private void chapter7Choice(int choice) {
 
         ui.clearChoices();
+        ui.hideCharacter();
+
 
         if (choice == 1) {
 
@@ -1551,19 +1598,11 @@ public class GameController {
 
         ui.showDialogue(
                 Lang.t("boss3.place"),
-                Lang.t("boss3.narr")
-        );
-
-        ui.showDialogue(
-                Lang.t("npc.kapzs"),
-                Lang.t("boss3.header")
-        );
-
-        ui.showDialogue(
-                Lang.t("ui.title"),
-                Lang.t("boss3.rule1") + "\n\n"
-                        + Lang.t("boss3.rule2") + "\n\n"
-                        + Lang.t("boss3.rule3")
+                Lang.t("boss3.narr") + "\n\n"
+                        + Lang.t("boss3.header").trim() + "\n"
+                        + Lang.t("boss3.rule1").trim() + "\n"
+                        + Lang.t("boss3.rule2").trim() + "\n"
+                        + Lang.t("boss3.rule3").trim()
         );
 
         ui.addChoice(
@@ -1578,6 +1617,16 @@ public class GameController {
         state.resetBossFight();
 
         ui.clearChoices();
+
+        ui.clearBossAbilities();
+        ui.addBossAbility(Lang.t("boss3.ab1.name"), Lang.t("boss3.ab1.desc"));
+        ui.addBossAbility(Lang.t("boss3.ab2.name"), Lang.t("boss3.ab2.desc"));
+        ui.addBossAbility(Lang.t("boss3.ab3.name"), Lang.t("boss3.ab3.desc"));
+
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/kapzsimre2.png"
+        );
+
 
         ui.showBossFight(
                 Lang.t("npc.kapzs"),
@@ -1699,6 +1748,7 @@ public class GameController {
 
         ui.hideBossFight();
         ui.clearChoices();
+        ui.hideCharacter();
 
         ui.showDialogue(
                 Lang.t("ui.title"),
@@ -1739,6 +1789,11 @@ public class GameController {
     private void endingScene() {
 
         ui.clearChoices();
+
+        ui.showImage(
+                "/com/example/demo/fityesz_art/bg/ch7-3_office.png"
+        );
+        ui.hideCharacter();
 
         ui.showDialogue(
                 Lang.t("ui.title"),

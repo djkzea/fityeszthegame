@@ -2,8 +2,6 @@ package com.example.demo;
 
 import javafx.application.Application;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 
 public class HelloApplication extends Application {
@@ -11,9 +9,7 @@ public class HelloApplication extends Application {
     @Override
     public void start(Stage stage) {
 
-        GameController controller =
-                new GameController(stage);
-
+        GameController controller = new GameController(stage);
 
         Scene scene = new Scene(
                 controller.getUI().getRoot(),
@@ -21,28 +17,17 @@ public class HelloApplication extends Application {
                 800
         );
 
+        // Enter / Space = continue (finishes the typewriter first), 1-9 = choices
+        controller.getUI().installKeys(scene);
 
-        stage.setTitle(
-                "The Fityesz Chronicle"
-        );
-
-
+        stage.setTitle("The Fityesz Chronicle");
+        stage.setMinWidth(900);
+        stage.setMinHeight(650);
         stage.setScene(scene);
-
-        scene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
-
-            if (event.getCode() == KeyCode.ENTER) {
-                controller.getUI().pressEnterButton();
-                event.consume();
-            }
-        });
-
         stage.show();
     }
 
-
     public static void main(String[] args) {
-
         launch();
     }
 }
