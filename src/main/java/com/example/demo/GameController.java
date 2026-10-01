@@ -43,10 +43,7 @@ public class GameController {
 
         ui.setOnGameRestart(this::restartGame);
 
-        ui.showOpeningScreen(
-                this::showLanguageSelection,
-                stage::close
-        );
+        showLanguageSelection();
     }
 
     // ==================================================

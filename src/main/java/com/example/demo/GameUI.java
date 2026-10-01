@@ -59,18 +59,6 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Game screen, styled after the website (fityeszthegame.com).
- *
- * The public methods used by GameController are unchanged:
- * showDialogue, addChoice, clearChoices, showImage, showCharacter,
- * hideCharacter, hideImage, showBossFight, updateBossHp, hideBossFight,
- * updateStats, updateLanguage, pressEnterButton, getRoot, getChoicesBox, show.
- *
- * New optional methods:
- * setChapter, setLocation, setProgress, setChoicePrompt,
- * showItemAcquired, setOnRestart, installKeys.
- */
 public class GameUI {
 
     // =========================================================
@@ -158,13 +146,6 @@ public class GameUI {
     private final ImageView backgroundView;
     private final Label ghostLabel;
     private final ImageView characterView;
-    private final StackPane openingScreen;
-    private final ImageView openingBackgroundView;
-    private final Label openingTitle;
-    private final VBox openingMenu;
-    private final Button newGameButton;
-    private final Button loadGameButton;
-    private final Button exitButton;
     private String characterPose1;
     private String characterPose2;
     private boolean secondCharacterPose = false;
@@ -889,95 +870,6 @@ public class GameUI {
         setShown(exposedCard, false);
 
         // -----------------------------------------------------
-// OPENING SCREEN
-// -----------------------------------------------------
-
-        openingBackgroundView = new ImageView();
-        openingBackgroundView.setPreserveRatio(false);
-        openingBackgroundView.setSmooth(true);
-        openingBackgroundView.setMouseTransparent(true);
-
-        openingBackgroundView.fitWidthProperty().bind(stagePane.widthProperty());
-        openingBackgroundView.fitHeightProperty().bind(stagePane.heightProperty());
-
-        openingBackgroundView.setImage(
-                loadImage("/com/example/demo/fityesz_art/bg/opening.png")
-        );
-
-// -----------------------------------------------------
-// OPENING TITLE
-// -----------------------------------------------------
-
-        openingTitle = new Label("FITYESZ CHRONICLE");
-        openingTitle.setFont(head(78));
-        openingTitle.setTextFill(Color.web(INK));
-        openingTitle.setAlignment(Pos.CENTER);
-        openingTitle.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
-
-        openingTitle.setEffect(
-                new DropShadow(
-                        12,
-                        0,
-                        3,
-                        Color.rgb(255, 255, 255, 0.75)
-                )
-        );
-
-        StackPane.setAlignment(openingTitle, Pos.CENTER);
-
-// -----------------------------------------------------
-// OPENING MENU
-// -----------------------------------------------------
-
-        newGameButton = createOpeningButton("NEW GAME", true);
-        loadGameButton = createOpeningButton("LOAD GAME", false);
-        exitButton = createOpeningButton("EXIT", true);
-
-        loadGameButton.setDisable(true);
-        loadGameButton.setOpacity(0.45);
-
-        openingMenu = new VBox(
-                10,
-                newGameButton,
-                loadGameButton,
-                exitButton
-        );
-
-        openingMenu.setAlignment(Pos.CENTER_LEFT);
-        openingMenu.setMaxWidth(300);
-
-        StackPane.setAlignment(
-                openingMenu,
-                Pos.CENTER_LEFT
-        );
-
-        StackPane.setMargin(
-                openingMenu,
-                new Insets(150, 0, 0, 80)
-        );
-
-// -----------------------------------------------------
-// OPENING SCREEN CONTAINER
-// -----------------------------------------------------
-
-        openingScreen = new StackPane(
-                openingBackgroundView,
-                openingTitle,
-                openingMenu
-        );
-
-        openingScreen.setMaxSize(
-                Double.MAX_VALUE,
-                Double.MAX_VALUE
-        );
-
-        openingScreen.setStyle(
-                "-fx-background-color: " + PAGE + ";"
-        );
-
-        setShown(openingScreen, false);
-
-        // -----------------------------------------------------
         // ASSEMBLE
         // -----------------------------------------------------
 
@@ -993,8 +885,7 @@ public class GameUI {
                 itemPopup,
                 titleCard,
                 summaryCard,
-                exposedCard,
-                openingScreen
+                exposedCard
         );
 
         stagePane.setOnMouseClicked(e -> {
@@ -1054,50 +945,6 @@ public class GameUI {
     private static void setShown(Node node, boolean shown) {
         node.setVisible(shown);
         node.setManaged(shown);
-    }
-
-    private Button createOpeningButton(String text, boolean active) {
-
-        Button button = new Button(text);
-
-        button.setFont(head(28));
-        button.setFocusTraversable(false);
-
-        button.setMinWidth(280);
-        button.setPrefWidth(280);
-        button.setMaxWidth(280);
-
-        button.setMinHeight(52);
-        button.setPrefHeight(52);
-
-        String normalStyle =
-                "-fx-background-color: transparent;" +
-                        "-fx-background-radius: 0;" +
-                        "-fx-border-color: transparent;" +
-                        "-fx-border-width: 0 0 0 5;" +
-                        "-fx-text-fill: " + INK + ";" +
-                        "-fx-alignment: CENTER_LEFT;" +
-                        "-fx-padding: 5 15 5 18;" +
-                        "-fx-cursor: hand;";
-
-        String hoverStyle =
-                "-fx-background-color: " + INK + ";" +
-                        "-fx-background-radius: 0;" +
-                        "-fx-border-color: " + RED + ";" +
-                        "-fx-border-width: 0 0 0 5;" +
-                        "-fx-text-fill: white;" +
-                        "-fx-alignment: CENTER_LEFT;" +
-                        "-fx-padding: 5 15 5 18;" +
-                        "-fx-cursor: hand;";
-
-        button.setStyle(normalStyle);
-
-        if (active) {
-            button.setOnMouseEntered(e -> button.setStyle(hoverStyle));
-            button.setOnMouseExited(e -> button.setStyle(normalStyle));
-        }
-
-        return button;
     }
 
     private void styleFilledButton(Button button) {
@@ -2142,7 +1989,7 @@ public class GameUI {
         showItemAcquired(name, null);
     }
 
-   // Shows the "Acquired" card over the scene. The dialogue, the choices, the boss box and the portrait are hidden while it is displayed. After about two second (or Enter / a click) everything comes back and onDone runs.
+    // Shows the "Acquired" card over the scene. The dialogue, the choices, the boss box and the portrait are hidden while it is displayed. After about two second (or Enter / a click) everything comes back and onDone runs.
 
     public void showItemAcquired(String name, Runnable onDone) {
 
@@ -2309,127 +2156,6 @@ public class GameUI {
 
     // LANGUAGE / ACCESSORS
 
-    // =========================================================
-// OPENING SCREEN
-// =========================================================
-
-    public void showOpeningScreen(Runnable onNewGame, Runnable onExit) {
-
-        // Hide the normal game header.
-        Node top = root.getTop();
-
-        if (top != null) {
-            top.setVisible(false);
-            top.setManaged(false);
-        }
-
-        // Hide anything that could be left over from the actual game.
-        stopTyping();
-
-        setShown(overlay, false);
-        setShown(characterView, false);
-        setShown(characterTag, false);
-        setShown(locationStrip, false);
-        setShown(itemPopup, false);
-        setShown(titleCard, false);
-        setShown(summaryCard, false);
-        setShown(exposedCard, false);
-
-        // Make sure the opening image is loaded.
-        Image image = loadImage(
-                "/com/example/demo/fityesz_art/bg/opening.png"
-        );
-
-        openingBackgroundView.setImage(image);
-
-        // Make the title visible, but keep the menu hidden initially.
-        setShown(openingScreen, true);
-
-        openingTitle.setOpacity(0);
-        openingMenu.setOpacity(0);
-
-        setShown(openingTitle, true);
-        setShown(openingMenu, true);
-
-        // -----------------------------------------------------
-        // TITLE FADE IN
-        // -----------------------------------------------------
-
-        FadeTransition titleIn =
-                new FadeTransition(Duration.millis(1200), openingTitle);
-
-        titleIn.setFromValue(0);
-        titleIn.setToValue(1);
-
-        // -----------------------------------------------------
-        // TITLE STAYS ON SCREEN
-        // -----------------------------------------------------
-
-        PauseTransition titlePause =
-                new PauseTransition(Duration.millis(1800));
-
-        // -----------------------------------------------------
-        // TITLE FADE OUT
-        // -----------------------------------------------------
-
-        FadeTransition titleOut =
-                new FadeTransition(Duration.millis(1800), openingTitle);
-
-        titleOut.setFromValue(1);
-        titleOut.setToValue(0);
-
-        // -----------------------------------------------------
-        // MENU FADE IN
-        // -----------------------------------------------------
-
-        FadeTransition menuIn =
-                new FadeTransition(Duration.millis(900), openingMenu);
-
-        menuIn.setFromValue(0);
-        menuIn.setToValue(1);
-
-        titleOut.setOnFinished(e -> {
-            menuIn.play();
-        });
-
-        new SequentialTransition(
-                titleIn,
-                titlePause,
-                titleOut
-        ).play();
-
-        // -----------------------------------------------------
-        // BUTTON ACTIONS
-        // -----------------------------------------------------
-
-        newGameButton.setOnAction(e -> {
-
-            hideOpeningScreen();
-
-            if (onNewGame != null) {
-                onNewGame.run();
-            }
-        });
-
-        exitButton.setOnAction(e -> {
-
-            if (onExit != null) {
-                onExit.run();
-            }
-        });
-    }
-
-    public void hideOpeningScreen() {
-
-        setShown(openingScreen, false);
-
-        Node top = root.getTop();
-
-        if (top != null) {
-            top.setVisible(true);
-            top.setManaged(true);
-        }
-    }
 
     public void updateLanguage() {
 
