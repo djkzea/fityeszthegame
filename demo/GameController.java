@@ -512,7 +512,7 @@ public class GameController {
     private void lakatosIntroduction() {
         ui.clearChoices();
 
-        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatos.png");
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png");
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
@@ -524,6 +524,7 @@ public class GameController {
 
     private void lakatosRules() {
         ui.clearChoices();
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin2.png");
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
@@ -535,6 +536,7 @@ public class GameController {
 
     private void lakatosChoice() {
         ui.clearChoices();
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png");
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
@@ -611,7 +613,7 @@ public class GameController {
     private void chapter3() {
         ui.clearChoices();
 
-        ui.showImage("/com/example/demo/fityesz_art/bg/ch3_congress.png");
+        ui.showImage("/com/example/demo/fityesz_art/bg/ch3_hall.png");
         ui.hideCharacter();
 
         ui.showDialogue(
@@ -855,6 +857,11 @@ public class GameController {
             }
         }
 
+        // angry pose when FELJELENTÉS lands
+        ui.showCharacter(sameMove >= 3
+                ? "/com/example/demo/fityesz_art/characters/lakatoservin2.png"
+                : "/com/example/demo/fityesz_art/characters/lakatoservin.png");
+
         ui.updateBossHp(
                 Lang.t("npc.lakatos"),
                 state.getPlayerHp(),
@@ -944,6 +951,8 @@ public class GameController {
 
     private void chapter4() {
         ui.clearChoices();
+        ui.showImage("/com/example/demo/fityesz_art/bg/ch4_office.png");
+        ui.hideCharacter();
 
         ui.showDialogue(
                 Lang.t("ui.chapter"),
@@ -981,6 +990,7 @@ public class GameController {
 
     private void chapter4Peteri() {
         ui.clearChoices();
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin.png");
 
         ui.showDialogue(
                 Lang.t("npc.peteri"),
@@ -997,6 +1007,7 @@ public class GameController {
 
     private void chapter4Conversation() {
         ui.clearChoices();
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin2.png");
 
         ui.showDialogue(
                 Lang.t("npc.peteri"),
@@ -1085,7 +1096,7 @@ public class GameController {
         ui.clearChoices();
 
         ui.showImage(
-                "/com/example/demo/fityesz_art/bg/ch5_parliament.png"
+                "/com/example/demo/fityesz_art/bg/ch5_corridor.png"
         );
         ui.hideCharacter();
 
@@ -1141,6 +1152,7 @@ public class GameController {
     private void chapter5Conversation() {
 
         ui.clearChoices();
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/molnar2.png");
 
         ui.showDialogue(
                 Lang.t("npc.molnar"),
@@ -1265,7 +1277,7 @@ public class GameController {
         ui.addBossAbility(Lang.t("boss2.skill"), Lang.t("boss2.ab.desc"));
 
         ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/peteri.png"
+                "/com/example/demo/fityesz_art/characters/drpeterikatalin.png"
         );
 
         ui.showDialogue(
@@ -1370,6 +1382,11 @@ public class GameController {
             }
         }
 
+        // pointing pose when MEDIA SCANDAL lands
+        ui.showCharacter(result.startsWith(Lang.t("boss2.skill"))
+                ? "/com/example/demo/fityesz_art/characters/drpeterikatalin2.png"
+                : "/com/example/demo/fityesz_art/characters/drpeterikatalin.png");
+
         ui.updateBossHp(
                 Lang.t("npc.peteri"),
                 state.getPlayerHp(),
@@ -1449,7 +1466,7 @@ public class GameController {
         ui.clearChoices();
 
         ui.showImage(
-                "/com/example/demo/fityesz_art/bg/ch6_office.png"
+                "/com/example/demo/fityesz_art/bg/ch6_lodge.png"
         );
         ui.hideCharacter();
 
@@ -1488,7 +1505,7 @@ public class GameController {
         ui.clearChoices();
 
         ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/kapzs.png"
+                "/com/example/demo/fityesz_art/characters/kapzsimre.png"
         );
 
         ui.showDialogue(
@@ -1603,7 +1620,7 @@ public class GameController {
         ui.clearChoices();
 
         ui.showImage(
-                "/com/example/demo/fityesz_art/bg/ch7_office_night.png"
+                "/com/example/demo/fityesz_art/bg/ch7-1_office.png"
         );
         ui.hideCharacter();
 
@@ -1753,6 +1770,7 @@ public class GameController {
     private void boss3Introduction() {
 
         ui.clearChoices();
+        ui.showImage("/com/example/demo/fityesz_art/bg/ch7-2_chamber.png");
 
         ui.showDialogue(
                 Lang.t("boss3.place"),
@@ -1856,6 +1874,10 @@ public class GameController {
                 result = Lang.t("fight.bothDefended");
             }
         }
+
+        ui.showCharacter(playerMove == 1
+                ? "/com/example/demo/fityesz_art/characters/kapzsimre2.png"
+                : "/com/example/demo/fityesz_art/characters/kapzsimre.png");
 
         ui.updateBossHp(
                 Lang.t("npc.kapzs"),
