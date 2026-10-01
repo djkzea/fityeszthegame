@@ -26,7 +26,6 @@ import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.BackgroundImage;
@@ -146,7 +145,6 @@ public class GameUI {
 
     // header
     private final Label chapterTitle;
-    private final Label playerLink;
     private final Label xpName, xpValue;
     private final Label exposureName, exposureValue;
     private final Label itemsName, itemsValue;
@@ -344,14 +342,7 @@ public class GameUI {
         chapterTitle.setFont(head(30));
         chapterTitle.setTextFill(Color.web(INK));
 
-        playerLink = new Label("");
-        playerLink.setFont(body(12));
-        playerLink.setUnderline(true);
-        playerLink.setTextFill(Color.web(INK));
-        playerLink.setCursor(javafx.scene.Cursor.HAND);
-        setShown(playerLink, false);
-
-        VBox titleBox = new VBox(0, chapterTitle, playerLink);
+        VBox titleBox = new VBox(0, chapterTitle);
         titleBox.setAlignment(Pos.CENTER_LEFT);
 
         xpName = statName(Lang.t("ui.xp"));
@@ -1658,15 +1649,6 @@ public class GameUI {
 
     public void updateStats(GameState state) {
 
-        if (state.getName() == null || state.getName().isBlank()) {
-            setShown(playerLink, false);
-        } else {
-            playerLink.setText(
-                    state.getName() + " — " + (Lang.magyar() ? "Nem te vagy?" : "Not you?")
-            );
-            setShown(playerLink, true);
-        }
-
         xpValue.setText(String.valueOf(state.getXp()));
 
         if (state.getXp() > lastXp) {
@@ -1734,7 +1716,6 @@ public class GameUI {
 
     public void setOnRestart(Runnable action) {
         restartButton.setOnAction(e -> action.run());
-        playerLink.setOnMouseClicked((MouseEvent e) -> action.run());
     }
 
     /** Called by the early-ending card button and by the header RESTART button. */
@@ -2012,23 +1993,20 @@ public class GameUI {
         setShown(characterTag, false);
     }
 
-    // =========================================================
+
     // ITEM POPUP
-    // =========================================================
+
 
     public void showItemAcquired(String name) {
         showItemAcquired(name, null);
     }
 
-    /**
-     * Shows the "Acquired" card over the scene. The dialogue, the choices, the boss box
-     * and the portrait are hidden while it is displayed. After about two seconds
-     * (or Enter / a click) everything comes back and onDone runs.
-     */
+   // Shows the "Acquired" card over the scene. The dialogue, the choices, the boss box and the portrait are hidden while it is displayed. After about two second (or Enter / a click) everything comes back and onDone runs.
+
     public void showItemAcquired(String name, Runnable onDone) {
 
         if (itemActive) {
-            // another card is still up: close it without running its callback
+
             if (itemAnim != null) {
                 itemAnim.stop();
             }
@@ -2106,9 +2084,9 @@ public class GameUI {
         }
     }
 
-    // =========================================================
+
     // BOSS FIGHT
-    // =========================================================
+
 
     public void showBossFight(String bossName, int playerHp, int bossHp) {
         setShown(bossArea, true);
@@ -2140,16 +2118,14 @@ public class GameUI {
         refreshLayout();
     }
 
-    /** Removes all ability rows. Call before adding the abilities of a new fight. */
+
     public void clearBossAbilities() {
         abilitiesBox.getChildren().setAll(abilitiesHeader);
         setShown(abilitiesBox, false);
     }
 
-    /**
-     * Adds one special-ability row to the boss box. The box is shown together with
-     * the boss HP bars, so the ability stays visible during the whole fight.
-     */
+    //The box is shown together with the boss HP bars, so the ability stays visible during the whole fight.
+
     public void addBossAbility(String name, String description) {
 
         Region stripe = new Region();
@@ -2189,9 +2165,9 @@ public class GameUI {
         }
     }
 
-    // =========================================================
+
     // LANGUAGE / ACCESSORS
-    // =========================================================
+
 
     public void updateLanguage() {
 

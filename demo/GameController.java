@@ -492,7 +492,7 @@ public class GameController {
     private void lakatosIntroduction() {
         ui.clearChoices();
 
-        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png");
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png", Lang.t("npc.lakatos"), Lang.t("npc.lakatos.role"));
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
@@ -504,7 +504,7 @@ public class GameController {
 
     private void lakatosRules() {
         ui.clearChoices();
-        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin2.png");
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin2.png", Lang.t("npc.lakatos"), Lang.t("npc.lakatos.role"));
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
@@ -516,7 +516,7 @@ public class GameController {
 
     private void lakatosChoice() {
         ui.clearChoices();
-        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png");
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png", Lang.t("npc.lakatos"), Lang.t("npc.lakatos.role"));
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
@@ -645,7 +645,7 @@ public class GameController {
     private void kapzsSpeech1() {
         ui.clearChoices();
 
-        ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre.png");
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre.png", Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
 
         ui.showDialogue(
@@ -672,9 +672,7 @@ public class GameController {
     private void kapzsSpeech3() {
         ui.clearChoices();
 
-        ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/kapzsimre.png"
-        );
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre.png", Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
@@ -733,9 +731,7 @@ public class GameController {
         ui.clearBossAbilities();
         ui.addBossAbility(Lang.t("boss1.skill"), Lang.t("boss1.ab.desc"));
 
-        ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/lakatoservin.png"
-        );
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png", Lang.t("npc.lakatos"), Lang.t("npc.lakatos.role"));
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
@@ -839,8 +835,9 @@ public class GameController {
 
         // angry pose when FELJELENTÉS lands
         ui.showCharacter(sameMove >= 3
-                ? "/com/example/demo/fityesz_art/characters/lakatoservin2.png"
-                : "/com/example/demo/fityesz_art/characters/lakatoservin.png");
+                        ? "/com/example/demo/fityesz_art/characters/lakatoservin2.png"
+                        : "/com/example/demo/fityesz_art/characters/lakatoservin.png",
+                Lang.t("npc.lakatos"), Lang.t("npc.lakatos.role"));
 
         ui.updateBossHp(
                 Lang.t("npc.lakatos"),
@@ -970,12 +967,11 @@ public class GameController {
 
     private void chapter4Peteri() {
         ui.clearChoices();
-        ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin.png");
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin.png", Lang.t("npc.peteri"), Lang.t("npc.peteri.role"));
 
         ui.showDialogue(
                 Lang.t("npc.peteri"),
-                Lang.t("ch4.t1") + "\n\n"
-                        + Lang.t("ch4.t2")
+                Lang.t("ch4.peteri1", state.getName())
         );
 
         ui.addChoice(
@@ -987,12 +983,11 @@ public class GameController {
 
     private void chapter4Conversation() {
         ui.clearChoices();
-        ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin2.png");
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin2.png", Lang.t("npc.peteri"), Lang.t("npc.peteri.role"));
 
         ui.showDialogue(
                 Lang.t("npc.peteri"),
-                Lang.t("ch4.peteri1", state.getName()) + "\n\n"
-                        + Lang.t("ch4.peteri2") + "\n\n"
+                Lang.t("ch4.peteri2") + "\n\n"
                         + Lang.t("ch4.q")
         );
 
@@ -1112,9 +1107,7 @@ public class GameController {
 
         ui.clearChoices();
 
-        ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/molnar.png"
-        );
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/molnar.png", Lang.t("npc.molnar"), Lang.t("npc.molnar.role"));
 
 
         ui.showDialogue(
@@ -1132,7 +1125,7 @@ public class GameController {
     private void chapter5Conversation() {
 
         ui.clearChoices();
-        ui.showCharacter("/com/example/demo/fityesz_art/characters/molnar2.png");
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/molnar2.png", Lang.t("npc.molnar"), Lang.t("npc.molnar.role"));
 
         ui.showDialogue(
                 Lang.t("npc.molnar"),
@@ -1256,9 +1249,7 @@ public class GameController {
         ui.clearBossAbilities();
         ui.addBossAbility(Lang.t("boss2.skill"), Lang.t("boss2.ab.desc"));
 
-        ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/drpeterikatalin.png"
-        );
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin.png", Lang.t("npc.peteri"), Lang.t("npc.peteri.role"));
 
         ui.showDialogue(
                 Lang.t("npc.peteri"),
@@ -1364,8 +1355,9 @@ public class GameController {
 
         // pointing pose when MEDIA SCANDAL lands
         ui.showCharacter(result.startsWith(Lang.t("boss2.skill"))
-                ? "/com/example/demo/fityesz_art/characters/drpeterikatalin2.png"
-                : "/com/example/demo/fityesz_art/characters/drpeterikatalin.png");
+                        ? "/com/example/demo/fityesz_art/characters/drpeterikatalin2.png"
+                        : "/com/example/demo/fityesz_art/characters/drpeterikatalin.png",
+                Lang.t("npc.peteri"), Lang.t("npc.peteri.role"));
 
         ui.updateBossHp(
                 Lang.t("npc.peteri"),
@@ -1484,9 +1476,7 @@ public class GameController {
 
         ui.clearChoices();
 
-        ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/kapzsimre.png"
-        );
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre.png", Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
@@ -1636,9 +1626,7 @@ public class GameController {
     private void kapzsChapter7() {
 
         ui.clearChoices();
-        ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/kapzsimre2.png"
-        );
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre2.png", Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
         ui.showDialogue(
                 Lang.t("npc.kapzs"),
@@ -1779,9 +1767,7 @@ public class GameController {
         ui.addBossAbility(Lang.t("boss3.ab2.name"), Lang.t("boss3.ab2.desc"));
         ui.addBossAbility(Lang.t("boss3.ab3.name"), Lang.t("boss3.ab3.desc"));
 
-        ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/kapzsimre2.png"
-        );
+        ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre2.png", Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
         // The long intro text (narration + rules) would stack with the boss box,
         // which already lists the rules, and push the top of the screen under the
@@ -1864,8 +1850,9 @@ public class GameController {
         }
 
         ui.showCharacter(playerMove == 1
-                ? "/com/example/demo/fityesz_art/characters/kapzsimre2.png"
-                : "/com/example/demo/fityesz_art/characters/kapzsimre.png");
+                        ? "/com/example/demo/fityesz_art/characters/kapzsimre2.png"
+                        : "/com/example/demo/fityesz_art/characters/kapzsimre.png",
+                Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
         ui.updateBossHp(
                 Lang.t("npc.kapzs"),

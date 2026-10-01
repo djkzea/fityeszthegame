@@ -150,6 +150,10 @@ public final class Lang {
         p("npc.peteri.short",    "Dr. Péteri", "Dr. Péteri");
         p("npc.lakatos.short",   "Lakatos", "Lakatos");
         p("npc.molnar",          "Molnár Gábor", "Molnár Gábor");
+        p("npc.lakatos.role",   "KERÜLETI ELNÖK", "DISTRICT CHAIRMAN");
+        p("npc.kapzs.role",     "MINISZTERELNÖK", "THE PRIME MINISTER");
+        p("npc.peteri.role",    "VÁLASZTMÁNYI ELNÖK", "COMMITTEE CHAIR");
+        p("npc.molnar.role",    "FRAKCIÓVEZETŐ", "THE PARTY WHIP");
         p("npc.you",             "Te", "You");
 
         // ── Targyak es rangok / Items and ranks ────────────────────────────
