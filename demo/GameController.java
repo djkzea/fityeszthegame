@@ -7,21 +7,98 @@ import javafx.stage.Stage;
 public class GameController {
 
     private final GameUI ui;
-    private final GameState state;
+    private GameState state;
     private final Stage stage;
 
     private final Random random = new Random();
 
+    private final java.util.List<GameUI.SummaryDecision> chapterDecisions = new java.util.ArrayList<>();
+
+    private void recordDecision(String questionKey, String answerText, int xpDelta, int exposureDelta) {
+
+        StringBuilder points = new StringBuilder();
+
+        if (xpDelta != 0) {
+            points.append(xpDelta > 0 ? "+" : "").append(xpDelta).append(" XP");
+        }
+
+        if (exposureDelta != 0) {
+            if (points.length() > 0) points.append(" · ");
+            points.append(exposureDelta > 0 ? "+" : "").append(exposureDelta);
+        }
+
+        chapterDecisions.add(
+                new GameUI.SummaryDecision(Lang.t(questionKey), answerText, points.toString())
+        );
+    }
+
     // Boss fight state
     private int previousMove = 0;
     private int sameMove = 0;
+    private int peteriPassiveRounds = 0;
 
     public GameController(Stage stage) {
         this.stage = stage;
         this.state = new GameState();
         this.ui = new GameUI();
 
+        ui.setOnGameRestart(this::restartGame);
+
         showLanguageSelection();
+    }
+
+    // ==================================================
+    // RESTART (early ending button / header RESTART button)
+    // ==================================================
+
+    /**
+     * Returns a step that shows the end-of-chapter summary card and, when the
+     * player presses Continue, runs "next". The decisions recorded with
+     * recordDecision() since the last summary are listed on the card.
+     */
+    private Runnable chapterSummary(int chapter, Runnable next) {
+
+        return () -> {
+
+            ui.clearChoices();
+
+            String nextUp = chapter < 7
+                    ? Lang.t("ui.nextUp") + " " + Lang.t("ui.chapter") + " " + (chapter + 1)
+                    + " · " + Lang.t("ch" + (chapter + 1) + ".title")
+                    : Lang.t("ui.nextUp") + " " + Lang.t("ui.theEnding");
+
+            ui.showChapterSummary(
+                    chapter,
+                    Lang.t("ch" + chapter + ".title"),
+                    chapterDecisions,
+                    nextUp
+            );
+
+            chapterDecisions.clear();
+
+            ui.addChoice(1, Lang.t("ui.enter"), next);
+        };
+    }
+
+    /** Wraps a "next step" so the "Acquired" card is shown first. */
+    private Runnable withItem(String itemKey, Runnable next) {
+        return () -> ui.showItemAcquired(Lang.t(itemKey), next);
+    }
+
+    private void restartGame() {
+
+        state = new GameState();
+
+        chapterDecisions.clear();
+
+        previousMove = 0;
+        sameMove = 0;
+        peteriPassiveRounds = 0;
+
+        ui.resetForNewGame();
+        ui.updateStats(state);
+
+        showStartScreen();
     }
 
     // ==================================================
@@ -61,6 +138,8 @@ public class GameController {
 
     private void showStartScreen() {
         ui.clearChoices();
+
+        ui.hideRestartButton();
 
         ui.showDialogue(
                 Lang.t("ui.title"),
@@ -241,30 +320,38 @@ public class GameController {
     private void chapter1Choice(int choice) {
         ui.clearChoices();
 
+        int xpDelta;
+        int exposureDelta;
+
         if (choice == 1) {
-            state.addXp(15);
-            state.addExposure(10);
+            xpDelta = 15;
+            exposureDelta = 10;
 
             ui.showDialogue(
                     Lang.t("npc.lipoti"),
                     Lang.t("ch1.q1.ans1")
             );
         } else if (choice == 2) {
-            state.addXp(10);
-            state.addExposure(5);
+            xpDelta = 10;
+            exposureDelta = 5;
 
             ui.showDialogue(
                     Lang.t("npc.lipoti"),
                     Lang.t("ch1.q1.ans2")
             );
         } else {
-            state.addXp(5);
+            xpDelta = 5;
+            exposureDelta = 0;
 
             ui.showDialogue(
                     Lang.t("npc.lipoti"),
                     Lang.t("ch1.q1.ans3")
             );
         }
+
+        state.addXp(xpDelta);
+        state.addExposure(exposureDelta);
+        recordDecision("ch1.q1", Lang.t("ch1.q1.opt" + choice), xpDelta, exposureDelta);
 
         ui.updateStats(state);
 
@@ -323,9 +410,12 @@ public class GameController {
     private void envelopeChoice(int choice) {
         ui.clearChoices();
 
+        int xpDelta;
+        int exposureDelta;
+
         if (choice == 1) {
-            state.addXp(20);
-            state.addExposure(15);
+            xpDelta = 20;
+            exposureDelta = 15;
             state.setFirstEnvelope(true);
 
             ui.showDialogue(
@@ -333,15 +423,16 @@ public class GameController {
                     Lang.t("ch1.q2.ans1")
             );
         } else if (choice == 2) {
-            state.addXp(10);
-            state.addExposure(5);
+            xpDelta = 10;
+            exposureDelta = 5;
 
             ui.showDialogue(
                     Lang.t("npc.lipoti"),
                     Lang.t("ch1.q2.ans2")
             );
         } else {
-            state.addExposure(-10);
+            xpDelta = 0;
+            exposureDelta = -10;
 
             ui.showDialogue(
                     Lang.t("npc.lipoti"),
@@ -349,9 +440,37 @@ public class GameController {
             );
         }
 
+        state.addXp(xpDelta);
+        state.addExposure(exposureDelta);
+        recordDecision("ch1.q2", Lang.t("ch1.q2.opt" + choice), xpDelta, exposureDelta);
+
         ui.updateStats(state);
 
-        ui.addChoice(1, Lang.t("ui.enter"), this::chapter2);
+        final boolean gotItem = (choice == 1);
+
+        ui.addChoice(1, Lang.t("ui.enter"), () -> {
+
+            Runnable summary = () -> {
+                ui.clearChoices();
+
+                ui.showChapterSummary(
+                        1,
+                        Lang.t("ch1.title"),
+                        chapterDecisions,
+                        Lang.t("ui.nextUp") + " " + Lang.t("ui.chapter") + " 2 · " + Lang.t("ch2.title")
+                );
+
+                chapterDecisions.clear();
+
+                ui.addChoice(1, Lang.t("ui.enter"), this::chapter2);
+            };
+
+            if (gotItem) {
+                ui.showItemAcquired(Lang.t("item.envelope1"), summary);
+            } else {
+                summary.run();
+            }
+        });
     }
 
     // ==================================================
@@ -472,7 +591,17 @@ public class GameController {
 
         ui.updateStats(state);
 
-        ui.addChoice(1, Lang.t("ui.enter"), this::chapter3);
+        int[] xpByChoice = {25, 10, 5};
+        int[] exposureByChoice = {20, 5, 0};
+        recordDecision("ch2.q", Lang.t("ch2.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
+
+        Runnable afterLakatosTalk = chapterSummary(2, this::chapter3);
+
+        ui.addChoice(
+                1,
+                Lang.t("ui.enter"),
+                choice == 1 ? withItem("item.envelopeSmall", afterLakatosTalk) : afterLakatosTalk
+        );
     }
 
     // ==================================================
@@ -761,20 +890,20 @@ public class GameController {
 
         state.addXp(50);
         state.setLakatosFile(true);
+        recordDecision("sum.boss", Lang.t("boss1.win"), 50, 0);
 
         ui.updateStats(state);
         ui.clearChoices();
 
         ui.showDialogue(
                 Lang.t("npc.lakatos"),
-                Lang.t("boss1.win") + "\n\n"
-                        + Lang.t("item.lakatosFile")
+                Lang.t("boss1.win")
         );
 
         ui.addChoice(
                 1,
                 Lang.t("ui.enter"),
-                this::afterLakatos
+                withItem("item.lakatosFile", chapterSummary(3, this::chapter4))
         );
     }
 
@@ -801,30 +930,13 @@ public class GameController {
         ui.addChoice(
                 2,
                 Lang.t("fight.quit"),
-                this::showStartScreen
+                this::restartGame
         );
     }
 
     // ==================================================
     // AFTER LAKATOS
     // ==================================================
-
-    private void afterLakatos() {
-        ui.hideBossFight();
-        ui.clearChoices();
-
-        ui.showDialogue(
-                Lang.t("npc.lakatos"),
-                Lang.t("boss1.win") + "\n\n"
-                        + Lang.t("item.lakatosFile")
-        );
-
-        ui.addChoice(
-                1,
-                Lang.t("ui.enter"),
-                this::chapter4
-        );
-    }
 
     // ==================================================
 // CHAPTER 4 - ORSZÁGOS VÁLASZTMÁNY ÁRNYAI
@@ -835,7 +947,9 @@ public class GameController {
 
         ui.showDialogue(
                 Lang.t("ui.chapter"),
-                Lang.t("ch4.title")
+                Lang.t("ch4.title") + "\n\n"
+                        + Lang.t("ch4.quote") + "\n\n"
+                        + Lang.t("ch4.place")
         );
 
         ui.addChoice(
@@ -853,19 +967,19 @@ public class GameController {
         ui.clearChoices();
 
         ui.showDialogue(
-                Lang.t("ui.chapter"),
-                Lang.t("ch4.quote") + "\n\n"
-                        + Lang.t("ch4.place")
+                Lang.t("npc.unknown"),
+                Lang.t("ch4.t1") + "\n\n"
+                        + Lang.t("ch4.t2")
         );
 
         ui.addChoice(
                 1,
                 Lang.t("ui.enter"),
-                this::chapter4Penteri
+                this::chapter4Peteri
         );
     }
 
-    private void chapter4Penteri() {
+    private void chapter4Peteri() {
         ui.clearChoices();
 
         ui.showDialogue(
@@ -953,10 +1067,16 @@ public class GameController {
             ui.updateStats(state);
         }
 
+        int[] xpByChoice = {25, 15, 5};
+        int[] exposureByChoice = {20, 10, -5};
+        recordDecision("ch4.q", Lang.t("ch4.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
+
+        Runnable toChapter5 = chapterSummary(4, this::chapter5);
+
         ui.addChoice(
                 1,
                 Lang.t("ui.enter"),
-                this::chapter5
+                choice == 1 ? withItem("item.offshore", toChapter5) : toChapter5
         );
     }
 
@@ -1086,10 +1206,16 @@ public class GameController {
 
         ui.updateStats(state);
 
+        int[] xpByChoice = {25, 10, 15};
+        int[] exposureByChoice = {20, 10, -5};
+        recordDecision("ch5.q", Lang.t("ch5.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
+
+        Runnable toPreparation = this::chapter5Preparation;
+
         ui.addChoice(
                 1,
                 Lang.t("ui.enter"),
-                this::chapter5Preparation
+                choice == 1 ? withItem("item.parliamentKey", toPreparation) : toPreparation
         );
     }
 
@@ -1131,6 +1257,7 @@ public class GameController {
 
         previousMove = 0;
         sameMove = 0;
+        peteriPassiveRounds = 0;
 
         ui.clearChoices();
 
@@ -1181,14 +1308,36 @@ public class GameController {
 
     private void peteriBossMove(int playerMove) {
 
+        // 1 = attack, 2 = defend
         int bossMove = random.nextInt(2) + 1;
+
+        // MEDIA SCANDAL: counts rounds in which the player did not attack.
+        if (playerMove == 2) {
+            peteriPassiveRounds++;
+        } else {
+            peteriPassiveRounds = 0;
+        }
 
         String result;
 
-        if (playerMove == 1) {
+        // Every 2nd round without an attack, Péteri hits the player.
+        if (peteriPassiveRounds >= 2) {
+
+            peteriPassiveRounds = 0;
+
+            state.setPlayerHp(
+                    state.getPlayerHp() - 20
+            );
+
+            result = Lang.t("boss2.skill") + "\n\n"
+                    + Lang.t("boss2.hit");
+        }
+
+        // Player attacks.
+        else if (playerMove == 1) {
 
             if (bossMove == 1) {
-
+                // Both attack.
                 state.setPlayerHp(
                         state.getPlayerHp() - 10
                 );
@@ -1200,22 +1349,23 @@ public class GameController {
                 result = Lang.t("fight.bothAttacked");
 
             } else {
-
+                // Péteri defends, the player still deals damage.
                 state.setBossHp(
                         state.getBossHp() - 20
                 );
 
-                result = Lang.t("boss2.hit");
+                result = Lang.t("boss2.struck");
             }
+        }
 
-        } else {
+        // Player defends.
+        else {
 
             if (bossMove == 1) {
-
+                // The player blocks Péteri's attack.
                 result = Lang.t("boss2.blocked");
-
             } else {
-
+                // Both defend.
                 result = Lang.t("fight.bothDefended");
             }
         }
@@ -1266,7 +1416,7 @@ public class GameController {
         ui.addChoice(
                 2,
                 Lang.t("fight.quit"),
-                this::showStartScreen
+                this::restartGame
         );
     }
 
@@ -1276,20 +1426,20 @@ public class GameController {
 
         state.addXp(80);
         state.setPeteriDossier(true);
+        recordDecision("sum.boss", Lang.t("boss2.win"), 80, 0);
 
         ui.updateStats(state);
         ui.clearChoices();
 
         ui.showDialogue(
                 Lang.t("npc.peteri"),
-                Lang.t("boss2.win") + "\n\n"
-                        + Lang.t("item.peteriDossier")
+                Lang.t("boss2.win")
         );
 
         ui.addChoice(
                 1,
                 Lang.t("ui.enter"),
-                this::chapter6
+                withItem("item.peteriDossier", chapterSummary(5, this::chapter6))
         );
     }
 
@@ -1436,10 +1586,14 @@ public class GameController {
 
         ui.updateStats(state);
 
+        int[] xpByChoice = {30, 20, 10};
+        int[] exposureByChoice = {15, 5, -5};
+        recordDecision("ch6.q", Lang.t("ch6.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
+
         ui.addChoice(
                 1,
                 Lang.t("ui.enter"),
-                this::chapter7
+                chapterSummary(6, this::chapter7)
         );
     }
 
@@ -1582,6 +1736,10 @@ public class GameController {
         }
 
         ui.updateStats(state);
+
+        int[] xpByChoice = {30, 20, 10};
+        int[] exposureByChoice = {20, 10, -5};
+        recordDecision("ch7.q", Lang.t("ch7.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
 
         ui.addChoice(
                 1,
@@ -1729,6 +1887,7 @@ public class GameController {
         ui.clearChoices();
 
         state.addXp(100);
+        recordDecision("sum.boss", Lang.t("boss3.win"), 100, 0);
 
         ui.updateStats(state);
 
@@ -1740,7 +1899,7 @@ public class GameController {
         ui.addChoice(
                 1,
                 Lang.t("ui.enter"),
-                this::endDemo
+                chapterSummary(7, this::endDemo)
         );
     }
 
@@ -1764,7 +1923,7 @@ public class GameController {
         ui.addChoice(
                 2,
                 Lang.t("fight.quit"),
-                this::showStartScreen
+                this::restartGame
         );
     }
     // ==================================================
@@ -1833,10 +1992,12 @@ public class GameController {
                         + Lang.t("end.unknown")
         );
 
+        ui.showRestartButton();
+
         ui.addChoice(
                 1,
                 Lang.t("fight.again"),
-                this::showStartScreen
+                this::restartGame
         );
     }
 

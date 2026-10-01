@@ -102,12 +102,26 @@ public final class Lang {
         // ── Kezelofelulet / UI chrome ──────────────────────────────────────
         p("ui.title",            "FITYESZ KRÓNIKA", "THE FITYESZ CHRONICLE");
         p("ui.chapter",          "FEJEZET", "CHAPTER");
+        p("ui.endOfChapter",     "FEJEZET VÉGE", "END OF CHAPTER");
+        p("ui.continue",         "Tovább", "Continue");
+        p("ui.yourDecisions",    "A döntéseid", "Your decisions");
+        p("ui.nextUp",           "Következik:", "Next up:");
+        p("ui.theEnding",        "A vég", "The ending");
+        p("sum.boss",            "Főnökharc", "Boss fight");
+        // ── Early ending: exposure reached 100 ─────────────────────────────
+        p("ui.exposedKicker",    "KORAI VÉG", "EARLY ENDING");
+        p("ui.exposedTitle",     "LELEPLEZTEK", "EXPOSED");
+        p("ui.exposedText",      "Túl sok titkot és túl sok borítékot hagytál magad mögött. A nyomozók, az újságírók és még a saját pártod is ugyanazt a nevet suttogja: a tiédet. A karriered véget ért, mielőtt igazán elkezdődhetett volna.",
+                "You left too many secrets and too many envelopes behind you. Investigators, journalists and even your own party are whispering the same name: yours. Your career is over before it ever truly began.");
+        p("ui.exposedAsk",       "Szeretnéd újrakezdeni a játékot?", "Would you like to start the game over?");
+
         p("ui.player",           "JÁTÉKOS", "PLAYER");
         p("ui.restart",          "ÚJRAKEZDÉS", "RESTART");
         p("ui.items",            "TÁRGYAK", "ITEMS");
         p("ui.choose",           "Válassz", "Choose");
         p("ui.bossfight",        "BOSSFIGHT", "BOSSFIGHT");
         p("ui.item",             "MEGSZERZETT TÁRGY", "ITEM ACQUIRED");
+        p("ui.acquired",         "Megszerezve", "Acquired");
         p("ui.levelup",          "✦  SZINTLÉPÉS!  ✦", "✦  LEVEL UP!  ✦");
         p("ui.newrank",          "Új rang: ", "New rank: ");
         p("ui.xp",               "XP", "XP");
@@ -364,8 +378,9 @@ public final class Lang {
         p("boss2.rule2",         "  Péteri MÉDIABOTRÁNY képessége!",
                 "  Péteri's MEDIA SCANDAL move!");
         p("boss2.skill",         "MÉDIABOTRÁNY", "MEDIA SCANDAL");
-        p("boss2.blocked",       "Péteri kivédte.", "Péteri blocked it.");
+        p("boss2.blocked",       "Kivédted Péteri támadását!", "You blocked Péteri's attack!");
         p("boss2.hit",           "Péteri megütött! -20 HP", "Péteri hit you! -20 HP");
+        p("boss2.struck",        "Eltaláltad Dr. Péterit! -20 HP", "You struck Dr. Péteri! -20 HP");
         p("boss2.win",           "Legyőzted Dr. Péterit!", "You defeated Dr. Péteri!");
 
         // ── 6. fejezet / Chapter 6 ─────────────────────────────────────────

@@ -17,7 +17,7 @@ public class HelloApplication extends Application {
                 800
         );
 
-        // Enter / Space = continue (finishes the typewriter first), 1-9 = choices
+        // Enter / Space = continue, 1-9 = choices
         controller.getUI().installKeys(scene);
 
         stage.setTitle("The Fityesz Chronicle");

@@ -191,6 +191,33 @@ public class GameUI {
     private final Label titleQuote;
     private final Label titleHint;
 
+    // chapter summary card
+    private final StackPane summaryCard;
+    private final Label summaryKicker;
+    private final Label summaryTitle;
+    private final Label summaryXpValue;
+    private final Label summaryExposureValue;
+    private final Label summaryItemsValue;
+    private final VBox summaryDecisionsBox;
+    private final Label summaryNextUp;
+    private final Label decisionsHeader;
+    private final Button summaryContinueButton;
+
+    // early ending card (exposure reached 100)
+    private final StackPane exposedCard;
+    private final Label exposedKicker;
+    private final Label exposedTitle;
+    private final Label exposedXpValue;
+    private final Label exposedExposureValue;
+    private final Label exposedItemsValue;
+    private final Label exposedText;
+    private final Label exposedAsk;
+    private final Button exposedRestartButton;
+    private boolean exposedShown = false;
+    private Runnable onGameRestart = null;
+
+    public record SummaryDecision(String question, String answer, String points) {}
+
     // item popup
     private final VBox itemPopup;
     private final Label itemKicker;
@@ -227,6 +254,11 @@ public class GameUI {
 
     private ParallelTransition characterAnim;
     private SequentialTransition itemAnim;
+    private boolean itemActive = false;
+    private Runnable itemDone = null;
+    private boolean overlayWasVisible = true;
+    private boolean characterWasVisible = false;
+    private boolean tagWasVisible = false;
 
     // =========================================================
     // SMALL BAR CONTROL (replaces ProgressBar, fully styleable)
@@ -335,6 +367,9 @@ public class GameUI {
         restartButton.setFont(label(11));
         restartButton.setFocusTraversable(false);
         styleOutlineButton(restartButton);
+
+        restartButton.setVisible(false);
+        restartButton.setManaged(false);
 
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
@@ -590,7 +625,7 @@ public class GameUI {
         // ITEM POPUP
         // -----------------------------------------------------
 
-        itemKicker = new Label(Lang.t("ui.item"));
+        itemKicker = new Label(spaced(Lang.t("ui.acquired")));
         itemKicker.setFont(label(12));
         itemKicker.setTextFill(Color.web(RED));
 
@@ -611,6 +646,7 @@ public class GameUI {
         itemPopup.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
         itemPopup.setMouseTransparent(true);
         StackPane.setAlignment(itemPopup, Pos.CENTER);
+        itemPopup.translateYProperty().bind(stagePane.heightProperty().multiply(-0.16));
         setShown(itemPopup, false);
 
         // -----------------------------------------------------
@@ -651,6 +687,186 @@ public class GameUI {
         titleCard.setOnMouseClicked(e -> advance());
         setShown(titleCard, false);
 
+        // =====================================================
+        // CHAPTER SUMMARY CARD
+        // =====================================================
+
+        summaryKicker = new Label("");
+        summaryKicker.setFont(label(13));
+        summaryKicker.setTextFill(Color.WHITE);
+
+        summaryTitle = new Label("");
+        summaryTitle.setFont(head(56));
+        summaryTitle.setTextFill(Color.WHITE);
+        summaryTitle.setWrapText(true);
+        summaryTitle.setMaxWidth(700);
+
+        VBox summaryHeaderText = new VBox(4, summaryKicker, summaryTitle);
+        summaryHeaderText.setPadding(new Insets(28, 30, 26, 30));
+
+        StackPane summaryHeader = new StackPane(summaryHeaderText);
+        summaryHeader.setAlignment(Pos.CENTER_LEFT);
+        summaryHeader.setStyle("-fx-background-color: " + RED + ";");
+
+        summaryXpValue = statValue("0");
+
+        summaryExposureValue = statValue("0/100");
+        summaryExposureValue.setTextFill(Color.web(RED));
+
+        summaryItemsValue = statValue("0");
+
+        VBox summaryXpCol = new VBox(4, statName(Lang.t("ui.xp")), summaryXpValue);
+        summaryXpCol.setAlignment(Pos.CENTER);
+        HBox.setHgrow(summaryXpCol, Priority.ALWAYS);
+
+        VBox summaryExposureCol = new VBox(4, statName(Lang.t("ui.exposure")), summaryExposureValue);
+        summaryExposureCol.setAlignment(Pos.CENTER);
+        HBox.setHgrow(summaryExposureCol, Priority.ALWAYS);
+
+        VBox summaryItemsCol = new VBox(4, statName(Lang.t("ui.items")), summaryItemsValue);
+        summaryItemsCol.setAlignment(Pos.CENTER);
+        HBox.setHgrow(summaryItemsCol, Priority.ALWAYS);
+
+        Region summaryDivider1 = new Region();
+        summaryDivider1.setPrefWidth(1);
+        summaryDivider1.setMaxWidth(1);
+        summaryDivider1.setStyle("-fx-background-color: " + TRACK + ";");
+
+        Region summaryDivider2 = new Region();
+        summaryDivider2.setPrefWidth(1);
+        summaryDivider2.setMaxWidth(1);
+        summaryDivider2.setStyle("-fx-background-color: " + TRACK + ";");
+
+        HBox summaryStatsRow = new HBox(24, summaryXpCol, summaryDivider1, summaryExposureCol, summaryDivider2, summaryItemsCol);
+        summaryStatsRow.setAlignment(Pos.CENTER_LEFT);
+        summaryStatsRow.setPadding(new Insets(16, 24, 16, 24));
+        summaryStatsRow.setStyle("-fx-border-color: " + TRACK + "; -fx-border-width: 1;");
+
+        decisionsHeader = new Label(Lang.t("ui.yourDecisions").toUpperCase());
+        decisionsHeader.setFont(label(11.5));
+        decisionsHeader.setTextFill(Color.web(INK));
+
+        summaryDecisionsBox = new VBox(0);
+
+        summaryNextUp = new Label("");
+        summaryNextUp.setFont(body(14));
+        summaryNextUp.setTextFill(Color.web(INK));
+        summaryNextUp.setWrapText(true);
+
+        summaryContinueButton = new Button(Lang.t("ui.continue"));
+        summaryContinueButton.setFont(label(13));
+        summaryContinueButton.setFocusTraversable(false);
+        styleOutlineButton(summaryContinueButton);
+        summaryContinueButton.setOnAction(e -> advance());
+
+        HBox summaryButtonRow = new HBox(summaryContinueButton);
+        summaryButtonRow.setPadding(new Insets(6, 0, 0, 0));
+
+        VBox summaryBody = new VBox(18, summaryStatsRow, decisionsHeader, summaryDecisionsBox, summaryNextUp, summaryButtonRow);
+        summaryBody.setPadding(new Insets(26, 30, 30, 30));
+
+        VBox summaryContent = new VBox(summaryHeader, summaryBody);
+        summaryContent.setMaxWidth(640);
+        summaryContent.setStyle(
+                "-fx-background-color: " + PAPER + ";" +
+                        "-fx-border-color: " + INK + ";" +
+                        "-fx-border-width: 1.5;"
+        );
+
+        summaryCard = new StackPane(summaryContent);
+        summaryCard.setStyle("-fx-background-color: rgba(0,0,0,0.55);");
+        setShown(summaryCard, false);
+
+        // =====================================================
+        // EARLY ENDING CARD (exposure = 100)
+        // =====================================================
+
+        exposedKicker = new Label("");
+        exposedKicker.setFont(label(13));
+        exposedKicker.setTextFill(Color.WHITE);
+
+        exposedTitle = new Label("");
+        exposedTitle.setFont(head(72));
+        exposedTitle.setTextFill(Color.WHITE);
+
+        VBox exposedHeaderText = new VBox(4, exposedKicker, exposedTitle);
+        exposedHeaderText.setPadding(new Insets(28, 30, 26, 30));
+
+        StackPane exposedHeader = new StackPane(exposedHeaderText);
+        exposedHeader.setAlignment(Pos.CENTER_LEFT);
+        exposedHeader.setStyle("-fx-background-color: " + RED + ";");
+
+        exposedXpValue = statValue("0");
+        exposedExposureValue = statValue("100/100");
+        exposedExposureValue.setTextFill(Color.web(RED));
+        exposedItemsValue = statValue("0");
+
+        VBox exposedXpCol = new VBox(4, statName(Lang.t("ui.xp")), exposedXpValue);
+        exposedXpCol.setAlignment(Pos.CENTER);
+        HBox.setHgrow(exposedXpCol, Priority.ALWAYS);
+
+        VBox exposedExposureCol = new VBox(4, statName(Lang.t("ui.exposure")), exposedExposureValue);
+        exposedExposureCol.setAlignment(Pos.CENTER);
+        HBox.setHgrow(exposedExposureCol, Priority.ALWAYS);
+
+        VBox exposedItemsCol = new VBox(4, statName(Lang.t("ui.items")), exposedItemsValue);
+        exposedItemsCol.setAlignment(Pos.CENTER);
+        HBox.setHgrow(exposedItemsCol, Priority.ALWAYS);
+
+        Region exposedDivider1 = new Region();
+        exposedDivider1.setPrefWidth(1);
+        exposedDivider1.setMaxWidth(1);
+        exposedDivider1.setStyle("-fx-background-color: " + TRACK + ";");
+
+        Region exposedDivider2 = new Region();
+        exposedDivider2.setPrefWidth(1);
+        exposedDivider2.setMaxWidth(1);
+        exposedDivider2.setStyle("-fx-background-color: " + TRACK + ";");
+
+        HBox exposedStatsRow = new HBox(24, exposedXpCol, exposedDivider1, exposedExposureCol, exposedDivider2, exposedItemsCol);
+        exposedStatsRow.setAlignment(Pos.CENTER_LEFT);
+        exposedStatsRow.setPadding(new Insets(16, 24, 16, 24));
+        exposedStatsRow.setStyle("-fx-border-color: " + TRACK + "; -fx-border-width: 1;");
+
+        exposedText = new Label("");
+        exposedText.setFont(body(16));
+        exposedText.setTextFill(Color.web(INK));
+        exposedText.setWrapText(true);
+
+        exposedAsk = new Label("");
+        exposedAsk.setFont(Font.font(body(17).getFamily(), FontWeight.BOLD, 17));
+        exposedAsk.setTextFill(Color.web(INK));
+        exposedAsk.setWrapText(true);
+
+        exposedRestartButton = new Button("");
+        exposedRestartButton.setFont(head(24));
+        exposedRestartButton.setFocusTraversable(false);
+        styleFilledButton(exposedRestartButton);
+        exposedRestartButton.setOnAction(e -> {
+            if (onGameRestart != null) {
+                onGameRestart.run();
+            }
+        });
+
+        HBox exposedButtonRow = new HBox(exposedRestartButton);
+        exposedButtonRow.setPadding(new Insets(6, 0, 0, 0));
+
+        VBox exposedBody = new VBox(18, exposedStatsRow, exposedText, exposedAsk, exposedButtonRow);
+        exposedBody.setPadding(new Insets(26, 30, 30, 30));
+
+        VBox exposedContent = new VBox(exposedHeader, exposedBody);
+        exposedContent.setMaxWidth(640);
+        exposedContent.setMaxHeight(Region.USE_PREF_SIZE);
+        exposedContent.setStyle(
+                "-fx-background-color: " + PAPER + ";" +
+                        "-fx-border-color: " + INK + ";" +
+                        "-fx-border-width: 1.5;"
+        );
+
+        exposedCard = new StackPane(exposedContent);
+        exposedCard.setStyle("-fx-background-color: rgba(0,0,0,0.70);");
+        setShown(exposedCard, false);
+
         // -----------------------------------------------------
         // ASSEMBLE
         // -----------------------------------------------------
@@ -665,8 +881,16 @@ public class GameUI {
                 characterTag,
                 overlay,
                 itemPopup,
-                titleCard
+                titleCard,
+                summaryCard,
+                exposedCard
         );
+
+        stagePane.setOnMouseClicked(e -> {
+            if (itemActive) {
+                skipItem();
+            }
+        });
 
         root.setCenter(stagePane);
 
@@ -721,6 +945,22 @@ public class GameUI {
         node.setManaged(shown);
     }
 
+    private void styleFilledButton(Button button) {
+
+        String base =
+                "-fx-background-radius: 0;" +
+                        "-fx-border-color: " + INK + ";" +
+                        "-fx-border-width: 2;" +
+                        "-fx-padding: 10 26 8 26;" +
+                        "-fx-cursor: hand;";
+
+        button.setStyle("-fx-background-color: " + RED + "; -fx-text-fill: white;" + base);
+        button.setOnMouseEntered(e ->
+                button.setStyle("-fx-background-color: " + INK + "; -fx-text-fill: white;" + base));
+        button.setOnMouseExited(e ->
+                button.setStyle("-fx-background-color: " + RED + "; -fx-text-fill: white;" + base));
+    }
+
     private void styleOutlineButton(Button button) {
 
         Runnable normal = () -> {
@@ -758,6 +998,8 @@ public class GameUI {
 
         String sp = speaker == null ? "" : speaker.trim();
         String tx = text == null ? "" : text;
+
+        hideSummaryCard();
 
         // "CHAPTER" speaker = full red chapter card
         if (!sp.isEmpty() && sp.equalsIgnoreCase(Lang.t("ui.chapter"))) {
@@ -887,6 +1129,77 @@ public class GameUI {
         }
     }
 
+    public void showChapterSummary(
+            int chapterNumber,
+            String chapterTitle,
+            java.util.List<SummaryDecision> decisions,
+            String nextUpText
+    ) {
+        stopTyping();
+
+        summaryKicker.setText(spaced(Lang.t("ui.endOfChapter").toUpperCase() + " " + chapterNumber));
+        summaryTitle.setText(chapterTitle.toUpperCase());
+
+        summaryXpValue.setText(xpValue.getText());
+        summaryExposureValue.setText(exposureValue.getText());
+        summaryItemsValue.setText(itemsValue.getText());
+
+        summaryDecisionsBox.getChildren().clear();
+
+        for (SummaryDecision d : decisions) {
+
+            Label question = new Label(d.question());
+            question.setFont(label(12));
+            question.setTextFill(Color.web(GRAY));
+
+            Label answer = new Label(d.answer());
+            answer.setFont(Font.font(body(16).getFamily(), FontWeight.BOLD, 16));
+            answer.setTextFill(Color.web(INK));
+            answer.setWrapText(true);
+
+            Label points = new Label(d.points());
+            points.setFont(Font.font(body(14).getFamily(), FontWeight.BOLD, 14));
+            points.setTextFill(Color.web(RED));
+
+            VBox left = new VBox(2, question, answer);
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            HBox row = new HBox(12, left, spacer, points);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setPadding(new Insets(14, 0, 14, 0));
+            row.setStyle("-fx-border-color: " + TRACK + "; -fx-border-width: 0 0 1 0;");
+
+            summaryDecisionsBox.getChildren().add(row);
+        }
+
+        summaryNextUp.setText(nextUpText);
+
+        dialogueShown = false;
+        setLocation("");
+        chapterName = chapterTitle.toUpperCase();
+        chapterTitle = chapterTitle;  // (no-op placeholder removed below)
+
+        if (!summaryCard.isVisible()) {
+            setShown(summaryCard, true);
+            summaryCard.setOpacity(0);
+            FadeTransition fade = new FadeTransition(Duration.millis(380), summaryCard);
+            fade.setToValue(1);
+            fade.play();
+        }
+
+        updateGhost();
+        refreshLayout();
+    }
+
+    private void hideSummaryCard() {
+        if (summaryCard.isVisible()) {
+            setShown(summaryCard, false);
+            updateGhost();
+        }
+    }
+
     /** Thin-space letterspacing for small uppercase kickers. */
     private static String spaced(String s) {
         StringBuilder sb = new StringBuilder();
@@ -905,7 +1218,7 @@ public class GameUI {
 
     private void refreshLayout() {
 
-        boolean card = titleCard.isVisible();
+        boolean card = titleCard.isVisible() || summaryCard.isVisible();
 
         setShown(dialogueWrap, dialogueShown && !card);
 
@@ -1053,6 +1366,15 @@ public class GameUI {
     /** Enter: finishes the typewriter first, then continues. */
     public void pressEnterButton() {
 
+        if (exposedCard.isVisible()) {
+            return;
+        }
+
+        if (itemActive) {
+            skipItem();
+            return;
+        }
+
         if (typingActive) {
             finishTyping();
             return;
@@ -1069,7 +1391,7 @@ public class GameUI {
     /** Keys 1-9: picks the n-th visible choice. Returns true if a choice was fired. */
     public boolean pressChoice(int n) {
 
-        if (!choicesPanel.isVisible()) {
+        if (itemActive || exposedCard.isVisible() || !choicesPanel.isVisible()) {
             return false;
         }
 
@@ -1094,6 +1416,12 @@ public class GameUI {
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
 
             KeyCode code = event.getCode();
+
+            // early-ending card: swallow keys so nobody restarts by accident
+            if (exposedCard.isVisible()) {
+                event.consume();
+                return;
+            }
 
             if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
                 pressEnterButton();
@@ -1142,6 +1470,11 @@ public class GameUI {
 
         exposureValue.setText(state.getExposure() + "/100");
         exposureBar.set(state.getExposure() / 100.0, true);
+
+        if (state.getExposure() >= 100 && !exposedShown) {
+            exposedShown = true;
+            showExposedEnding(state);
+        }
 
         int items = 0;
         if (state.hasFirstEnvelope()) items++;
@@ -1196,6 +1529,82 @@ public class GameUI {
     public void setOnRestart(Runnable action) {
         restartButton.setOnAction(e -> action.run());
         playerLink.setOnMouseClicked((MouseEvent e) -> action.run());
+    }
+
+    /** Called by the early-ending card button and by the header RESTART button. */
+    public void setOnGameRestart(Runnable action) {
+        onGameRestart = action;
+        restartButton.setOnAction(e -> action.run());
+    }
+
+    private void showExposedEnding(GameState state) {
+
+        stopTyping();
+
+        exposedKicker.setText(spaced(Lang.t("ui.exposedKicker")));
+        exposedTitle.setText(Lang.t("ui.exposedTitle"));
+        exposedText.setText(Lang.t("ui.exposedText"));
+        exposedAsk.setText(Lang.t("ui.exposedAsk"));
+        exposedRestartButton.setText(Lang.t("ui.restart").toUpperCase());
+
+        exposedXpValue.setText(String.valueOf(state.getXp()));
+        exposedExposureValue.setText(state.getExposure() + "/100");
+        exposedItemsValue.setText(itemsValue.getText());
+
+        // visible (and click-blocking) right away, fades in after a short pause
+        // so the player first sees the exposure bar fill up
+        setShown(exposedCard, true);
+        exposedCard.setOpacity(0);
+
+        FadeTransition fade = new FadeTransition(Duration.millis(450), exposedCard);
+        fade.setToValue(1);
+
+        new SequentialTransition(new PauseTransition(Duration.millis(900)), fade).play();
+    }
+
+    /** Clears every on-screen leftover so a new game starts from a clean screen. */
+    public void resetForNewGame() {
+
+        stopTyping();
+
+        exposedShown = false;
+        setShown(exposedCard, false);
+        setShown(summaryCard, false);
+        setShown(titleCard, false);
+        setShown(itemPopup, false);
+
+        if (itemAnim != null) {
+            itemAnim.stop();
+        }
+        itemActive = false;
+        itemDone = null;
+        overlay.setVisible(true);
+
+        hideBossFight();
+        hideCharacter();
+        hideImage();
+        setLocation("");
+
+        chapterName = null;
+        chapterTitle.setText(Lang.t("ui.title").toUpperCase());
+
+        progress.set(0);
+        lastXp = 0;
+        dialogueShown = false;
+
+        clearChoices();
+        updateGhost();
+        refreshLayout();
+    }
+
+    public void showRestartButton() {
+        restartButton.setVisible(true);
+        restartButton.setManaged(true);
+    }
+
+    public void hideRestartButton() {
+        restartButton.setVisible(false);
+        restartButton.setManaged(false);
     }
 
     // =========================================================
@@ -1401,12 +1810,41 @@ public class GameUI {
     // =========================================================
 
     public void showItemAcquired(String name) {
+        showItemAcquired(name, null);
+    }
 
-        if (itemAnim != null) {
-            itemAnim.stop();
+    /**
+     * Shows the "Acquired" card over the scene. The dialogue, the choices, the boss box
+     * and the portrait are hidden while it is displayed. After about two seconds
+     * (or Enter / a click) everything comes back and onDone runs.
+     */
+    public void showItemAcquired(String name, Runnable onDone) {
+
+        if (itemActive) {
+            // another card is still up: close it without running its callback
+            if (itemAnim != null) {
+                itemAnim.stop();
+            }
+            itemDone = null;
+            finishItem();
         }
 
-        itemKicker.setText(Lang.t("ui.item"));
+        if (typingActive) {
+            finishTyping();
+        }
+
+        itemActive = true;
+        itemDone = onDone;
+
+        overlayWasVisible = overlay.isVisible();
+        characterWasVisible = characterView.isVisible();
+        tagWasVisible = characterTag.isVisible();
+
+        overlay.setVisible(false);
+        characterView.setVisible(false);
+        characterTag.setVisible(false);
+
+        itemKicker.setText(spaced(Lang.t("ui.acquired")));
         itemName.setText(name.toUpperCase());
 
         setShown(itemPopup, true);
@@ -1421,14 +1859,44 @@ public class GameUI {
         FadeTransition in = new FadeTransition(Duration.millis(200), itemPopup);
         in.setToValue(1);
 
-        PauseTransition hold = new PauseTransition(Duration.millis(1700));
+        PauseTransition hold = new PauseTransition(Duration.millis(1900));
 
-        FadeTransition out = new FadeTransition(Duration.millis(400), itemPopup);
+        FadeTransition out = new FadeTransition(Duration.millis(350), itemPopup);
         out.setToValue(0);
 
         itemAnim = new SequentialTransition(new ParallelTransition(scale, in), hold, out);
-        itemAnim.setOnFinished(e -> setShown(itemPopup, false));
+        itemAnim.setOnFinished(e -> finishItem());
         itemAnim.play();
+    }
+
+    private void skipItem() {
+        if (itemAnim != null) {
+            itemAnim.stop();
+        }
+        finishItem();
+    }
+
+    private void finishItem() {
+
+        if (!itemActive) {
+            return;
+        }
+
+        itemActive = false;
+        itemAnim = null;
+
+        setShown(itemPopup, false);
+
+        overlay.setVisible(overlayWasVisible);
+        characterView.setVisible(characterWasVisible);
+        characterTag.setVisible(tagWasVisible);
+
+        Runnable next = itemDone;
+        itemDone = null;
+
+        if (next != null) {
+            next.run();
+        }
     }
 
     // =========================================================
@@ -1528,7 +1996,9 @@ public class GameUI {
         xpName.setText(Lang.t("ui.xp").toUpperCase());
         exposureName.setText(Lang.t("ui.exposure").toUpperCase());
         itemsName.setText(Lang.t("ui.items").toUpperCase());
-        itemKicker.setText(Lang.t("ui.item"));
+        itemKicker.setText(spaced(Lang.t("ui.acquired")));
+        decisionsHeader.setText(Lang.t("ui.yourDecisions").toUpperCase());
+        summaryContinueButton.setText(Lang.t("ui.continue"));
 
         updateGhost();
     }
