@@ -1,7 +1,6 @@
 package com.example.demo;
 
 import java.util.Random;
-import javafx.scene.control.TextInputDialog;
 import javafx.stage.Stage;
 
 public class GameController {
@@ -149,39 +148,20 @@ public class GameController {
                         + Lang.t("intro.3")
         );
 
-        ui.addChoice(
+        // the button itself is the name field - no popup window
+        ui.addTextChoice(
                 1,
                 Lang.t("pro.namePrompt"),
-                this::askForName
+                24,
+                name -> {
+                    state.setName(name);
+                    ui.updateStats(state);
+
+                    showPrologue();
+                }
         );
 
         ui.updateStats(state);
-    }
-
-    // ==================================================
-    // NAME
-    // ==================================================
-
-    private void askForName() {
-        TextInputDialog dialog = new TextInputDialog();
-
-        dialog.setTitle(Lang.t("ui.title"));
-        dialog.setHeaderText(Lang.t("pro.namePrompt"));
-        dialog.setContentText(Lang.t("pro.namePrompt"));
-
-        dialog.showAndWait().ifPresent(input -> {
-            String name = input.trim();
-
-            if (name.isEmpty()) {
-                askForName();
-                return;
-            }
-
-            state.setName(name);
-            ui.updateStats(state);
-
-            showPrologue();
-        });
     }
 
     // ==================================================
@@ -1803,6 +1783,14 @@ public class GameController {
                 "/com/example/demo/fityesz_art/characters/kapzsimre2.png"
         );
 
+        // The long intro text (narration + rules) would stack with the boss box,
+        // which already lists the rules, and push the top of the screen under the
+        // header. Keep only the closing line of the narration.
+        String[] introLines = Lang.t("boss3.narr").split("\n");
+        ui.showDialogue(
+                Lang.t("boss3.place"),
+                introLines[introLines.length - 1]
+        );
 
         ui.showBossFight(
                 Lang.t("npc.kapzs"),

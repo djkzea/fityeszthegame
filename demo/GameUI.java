@@ -17,6 +17,8 @@ import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextFormatter;
 import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
@@ -209,6 +211,9 @@ public class GameUI {
     private final Label exposedTitle;
     private final Label exposedXpValue;
     private final Label exposedExposureValue;
+    // stat column captions on the summary / early-ending cards (refreshed on language change)
+    private Label summaryXpName, summaryExposureName, summaryItemsName;
+    private Label exposedXpName, exposedExposureName, exposedItemsName;
     private final Label exposedItemsValue;
     private final Label exposedText;
     private final Label exposedAsk;
@@ -414,7 +419,7 @@ public class GameUI {
         ghostLabel = new Label("");
         ghostLabel.setFont(head(300));
         ghostLabel.setTextFill(Color.web(RED, 0.16));
-        ghostLabel.setMinWidth(Region.USE_PREF_SIZE);
+        ghostLabel.setWrapText(true);
         ghostLabel.setLayoutX(-8);
         ghostLabel.setLayoutY(40);
 
@@ -426,8 +431,8 @@ public class GameUI {
         backgroundView.setManaged(false);
         backgroundView.setSmooth(true);
         backgroundView.setMouseTransparent(true);
-        stagePane.widthProperty().addListener((o, a, b) -> updateCover());
-        stagePane.heightProperty().addListener((o, a, b) -> updateCover());
+        stagePane.widthProperty().addListener((o, a, b) -> { updateCover(); fitGhost(); });
+        stagePane.heightProperty().addListener((o, a, b) -> { updateCover(); fitGhost(); });
 
         // dotted texture
         Region dots = new Region();
@@ -660,6 +665,10 @@ public class GameUI {
         titleMain = new Label("");
         titleMain.setFont(head(112));
         titleMain.setTextFill(Color.web("#FFF8EC"));
+        titleMain.setWrapText(true);
+        titleMain.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        titleMain.setAlignment(Pos.CENTER);
+        titleMain.setMinHeight(Region.USE_PREF_SIZE);
 
         titleQuote = new Label("");
         titleQuote.setFont(bodyItalic(23));
@@ -686,6 +695,14 @@ public class GameUI {
         titleCard.setCursor(javafx.scene.Cursor.HAND);
         titleCard.setOnMouseClicked(e -> advance());
         setShown(titleCard, false);
+
+        // responsive: limit widths to the card and refit the title on resize
+        titleContent.maxWidthProperty().bind(titleCard.widthProperty().multiply(0.9));
+        titleMain.maxWidthProperty().bind(titleCard.widthProperty().multiply(0.9));
+        titleQuote.maxWidthProperty().bind(
+                javafx.beans.binding.Bindings.min(760.0, titleCard.widthProperty().multiply(0.86)));
+        titleCard.widthProperty().addListener((o, a, b) -> fitTitleFont());
+        titleCard.heightProperty().addListener((o, a, b) -> fitTitleFont());
 
         // =====================================================
         // CHAPTER SUMMARY CARD
@@ -715,15 +732,18 @@ public class GameUI {
 
         summaryItemsValue = statValue("0");
 
-        VBox summaryXpCol = new VBox(4, statName(Lang.t("ui.xp")), summaryXpValue);
+        summaryXpName = statName(Lang.t("ui.xp"));
+        VBox summaryXpCol = new VBox(4, summaryXpName, summaryXpValue);
         summaryXpCol.setAlignment(Pos.CENTER);
         HBox.setHgrow(summaryXpCol, Priority.ALWAYS);
 
-        VBox summaryExposureCol = new VBox(4, statName(Lang.t("ui.exposure")), summaryExposureValue);
+        summaryExposureName = statName(Lang.t("ui.exposure"));
+        VBox summaryExposureCol = new VBox(4, summaryExposureName, summaryExposureValue);
         summaryExposureCol.setAlignment(Pos.CENTER);
         HBox.setHgrow(summaryExposureCol, Priority.ALWAYS);
 
-        VBox summaryItemsCol = new VBox(4, statName(Lang.t("ui.items")), summaryItemsValue);
+        summaryItemsName = statName(Lang.t("ui.items"));
+        VBox summaryItemsCol = new VBox(4, summaryItemsName, summaryItemsValue);
         summaryItemsCol.setAlignment(Pos.CENTER);
         HBox.setHgrow(summaryItemsCol, Priority.ALWAYS);
 
@@ -801,15 +821,18 @@ public class GameUI {
         exposedExposureValue.setTextFill(Color.web(RED));
         exposedItemsValue = statValue("0");
 
-        VBox exposedXpCol = new VBox(4, statName(Lang.t("ui.xp")), exposedXpValue);
+        exposedXpName = statName(Lang.t("ui.xp"));
+        VBox exposedXpCol = new VBox(4, exposedXpName, exposedXpValue);
         exposedXpCol.setAlignment(Pos.CENTER);
         HBox.setHgrow(exposedXpCol, Priority.ALWAYS);
 
-        VBox exposedExposureCol = new VBox(4, statName(Lang.t("ui.exposure")), exposedExposureValue);
+        exposedExposureName = statName(Lang.t("ui.exposure"));
+        VBox exposedExposureCol = new VBox(4, exposedExposureName, exposedExposureValue);
         exposedExposureCol.setAlignment(Pos.CENTER);
         HBox.setHgrow(exposedExposureCol, Priority.ALWAYS);
 
-        VBox exposedItemsCol = new VBox(4, statName(Lang.t("ui.items")), exposedItemsValue);
+        exposedItemsName = statName(Lang.t("ui.items"));
+        VBox exposedItemsCol = new VBox(4, exposedItemsName, exposedItemsValue);
         exposedItemsCol.setAlignment(Pos.CENTER);
         HBox.setHgrow(exposedItemsCol, Priority.ALWAYS);
 
@@ -1086,6 +1109,71 @@ public class GameUI {
     // TITLE CARD
     // =========================================================
 
+    /** Largest head-font size (from start down to min) at which the text wraps
+     *  on word boundaries into maxW x maxH and no single word is wider than maxW. */
+    private static double fitFontSize(String text, double maxW, double maxH, double start, double min) {
+
+        String[] words = text.trim().split("\\s+");
+
+        for (double size = start; size > min; size -= 2) {
+
+            Font f = head(size);
+            boolean ok = true;
+
+            for (String word : words) {
+                Text probe = new Text(word);
+                probe.setFont(f);
+                if (probe.getLayoutBounds().getWidth() > maxW) {
+                    ok = false;
+                    break;
+                }
+            }
+
+            if (ok) {
+                Text block = new Text(text);
+                block.setFont(f);
+                block.setWrappingWidth(maxW);
+                if (block.getLayoutBounds().getHeight() <= maxH) {
+                    return size;
+                }
+            }
+        }
+
+        return min;
+    }
+
+    private void fitTitleFont() {
+
+        String text = titleMain.getText();
+
+        double w = titleCard.getWidth() > 0 ? titleCard.getWidth() : stagePane.getWidth();
+        double h = titleCard.getHeight() > 0 ? titleCard.getHeight() : stagePane.getHeight();
+
+        if (text == null || text.isBlank() || w <= 0 || h <= 0) {
+            titleMain.setFont(head(112));
+            return;
+        }
+
+        titleMain.setFont(head(fitFontSize(text, w * 0.86, h * 0.42, 112, 36)));
+    }
+
+    private void fitGhost() {
+
+        String text = ghostLabel.getText();
+        double w = stagePane.getWidth();
+        double h = stagePane.getHeight();
+
+        if (text == null || text.isBlank() || w <= 0 || h <= 0) {
+            return;
+        }
+
+        double maxW = w - 16;
+
+        ghostLabel.setFont(head(fitFontSize(text, maxW, h * 0.6, 300, 60)));
+        ghostLabel.setPrefWidth(maxW);
+        ghostLabel.setMaxWidth(maxW);
+    }
+
     private void showTitleCard(String text) {
 
         stopTyping();
@@ -1098,7 +1186,8 @@ public class GameUI {
 
         titleKicker.setText(spaced(Lang.t("ui.chapter").toUpperCase()));
         titleMain.setText(title.toUpperCase());
-        titleMain.setFont(head(title.length() > 16 ? 84 : 112));
+        fitTitleFont();
+        javafx.application.Platform.runLater(this::fitTitleFont);
         titleQuote.setText(quote);
         titleHint.setText(Lang.t("ui.enter"));
 
@@ -1255,6 +1344,15 @@ public class GameUI {
 
         setShown(choicesPanel, panel);
 
+        if (panel) {
+            for (Node n : choicesBox.getChildren()) {
+                if (n instanceof HBox row && "nameRow".equals(row.getId())
+                        && row.getUserData() instanceof TextField tf && !tf.isFocused()) {
+                    javafx.application.Platform.runLater(tf::requestFocus);
+                }
+            }
+        }
+
         if (panel && !panelWasVisible) {
             choicesPanel.setOpacity(0);
             choicesPanel.setTranslateY(14);
@@ -1338,6 +1436,102 @@ public class GameUI {
         refreshLayout();
     }
 
+    /**
+     * A choice row that is itself a text field: the player types straight into
+     * the button and confirms with Enter (or the arrow). Empty input shakes the
+     * row instead of submitting.
+     */
+    public void addTextChoice(int number, String prompt, int maxLength, java.util.function.Consumer<String> onSubmit) {
+
+        Label numberBox = new Label(String.valueOf(number));
+        numberBox.setFont(label(13));
+        numberBox.setTextFill(Color.WHITE);
+        numberBox.setAlignment(Pos.CENTER);
+        numberBox.setMinSize(30, 30);
+        numberBox.setPrefSize(30, 30);
+        numberBox.setMaxSize(30, 30);
+        numberBox.setStyle("-fx-background-color: " + INK + ";");
+
+        TextField field = new TextField();
+        field.setPromptText(prompt.replaceAll("[:\\s]+$", "") + "…");
+        field.setFont(body(17));
+        field.setTextFormatter(new TextFormatter<String>(
+                change -> change.getControlNewText().length() <= maxLength ? change : null));
+        field.setStyle(
+                "-fx-background-color: transparent;" +
+                        "-fx-background-insets: 0;" +
+                        "-fx-border-color: transparent;" +
+                        "-fx-focus-color: transparent;" +
+                        "-fx-faint-focus-color: transparent;" +
+                        "-fx-padding: 0;" +
+                        "-fx-text-fill: " + INK + ";" +
+                        "-fx-prompt-text-fill: " + GRAY + ";" +
+                        "-fx-highlight-fill: " + RED + ";"
+        );
+        HBox.setHgrow(field, Priority.ALWAYS);
+
+        Button confirm = new Button("→");
+        confirm.setFont(label(15));
+        confirm.setFocusTraversable(false);
+        confirm.setMinSize(40, 40);
+        confirm.setPrefSize(40, 40);
+
+        HBox row = new HBox(16, numberBox, field, confirm);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setMinHeight(52);
+        row.setMaxWidth(Double.MAX_VALUE);
+        row.setId("nameRow");
+        row.setUserData(field);
+
+        Runnable restyle = () -> {
+            boolean focused = field.isFocused();
+            row.setStyle(
+                    "-fx-background-color: " + (focused ? "white" : "#F1EDE3") + ";" +
+                            "-fx-border-color: " + (focused ? RED : INK) + ";" +
+                            "-fx-border-width: " + (focused ? 2 : 1) + ";" +
+                            "-fx-padding: 4 6 4 11;" +
+                            "-fx-cursor: text;"
+            );
+        };
+        restyle.run();
+        field.focusedProperty().addListener((o, a, b) -> restyle.run());
+        row.setOnMouseClicked(e -> field.requestFocus());
+
+        Runnable styleConfirm = () -> confirm.setStyle(
+                "-fx-background-color: " + (confirm.isHover() ? RED : INK) + ";" +
+                        "-fx-background-radius: 0;" +
+                        "-fx-text-fill: white;" +
+                        "-fx-padding: 0;" +
+                        "-fx-cursor: hand;"
+        );
+        styleConfirm.run();
+        confirm.hoverProperty().addListener((o, a, b) -> styleConfirm.run());
+
+        Runnable submit = () -> {
+            String value = field.getText() == null ? "" : field.getText().trim();
+
+            if (value.isEmpty()) {
+                TranslateTransition shake = new TranslateTransition(Duration.millis(60), row);
+                shake.setFromX(0);
+                shake.setToX(8);
+                shake.setCycleCount(6);
+                shake.setAutoReverse(true);
+                shake.setOnFinished(e -> row.setTranslateX(0));
+                shake.play();
+                field.requestFocus();
+                return;
+            }
+
+            onSubmit.accept(value);
+        };
+
+        field.setOnAction(e -> submit.run());
+        confirm.setOnAction(e -> submit.run());
+
+        choicesBox.getChildren().add(row);
+        refreshLayout();
+    }
+
     private void styleChoice(Button button, Label numberBox, boolean hover) {
 
         button.setStyle(
@@ -1410,6 +1604,22 @@ public class GameUI {
         return false;
     }
 
+    /** 1-9 from either the number row or the numeric keypad; -1 for any other key. */
+    private static int digitOf(KeyCode code) {
+        return switch (code) {
+            case DIGIT1, NUMPAD1 -> 1;
+            case DIGIT2, NUMPAD2 -> 2;
+            case DIGIT3, NUMPAD3 -> 3;
+            case DIGIT4, NUMPAD4 -> 4;
+            case DIGIT5, NUMPAD5 -> 5;
+            case DIGIT6, NUMPAD6 -> 6;
+            case DIGIT7, NUMPAD7 -> 7;
+            case DIGIT8, NUMPAD8 -> 8;
+            case DIGIT9, NUMPAD9 -> 9;
+            default -> -1;
+        };
+    }
+
     /** Installs Enter / Space / 1-9 handling on a scene. */
     public void installKeys(Scene scene) {
 
@@ -1423,22 +1633,18 @@ public class GameUI {
                 return;
             }
 
+            // typing into a text field: leave Enter / Space / digits to the field
+            if (scene.getFocusOwner() instanceof javafx.scene.control.TextInputControl) {
+                return;
+            }
+
             if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
                 pressEnterButton();
                 event.consume();
                 return;
             }
 
-            int digit = -1;
-
-            if (code.isDigitKey()) {
-                digit = Integer.parseInt(code.getName());
-            } else if (code.isKeypadKey()) {
-                try {
-                    digit = Integer.parseInt(code.getName().replace("Numpad ", ""));
-                } catch (NumberFormatException ignored) {
-                }
-            }
+            int digit = digitOf(code);
 
             if (digit >= 1 && pressChoice(digit)) {
                 event.consume();
@@ -1644,6 +1850,7 @@ public class GameUI {
 
         String text = chapterName != null ? chapterName : Lang.t("ui.title").toUpperCase();
         ghostLabel.setText(text);
+        fitGhost();
     }
 
     /** "Cover" fit: fills the scene and crops the overflow instead of stretching. */
@@ -1999,6 +2206,13 @@ public class GameUI {
         itemKicker.setText(spaced(Lang.t("ui.acquired")));
         decisionsHeader.setText(Lang.t("ui.yourDecisions").toUpperCase());
         summaryContinueButton.setText(Lang.t("ui.continue"));
+
+        summaryXpName.setText(Lang.t("ui.xp").toUpperCase());
+        summaryExposureName.setText(Lang.t("ui.exposure").toUpperCase());
+        summaryItemsName.setText(Lang.t("ui.items").toUpperCase());
+        exposedXpName.setText(Lang.t("ui.xp").toUpperCase());
+        exposedExposureName.setText(Lang.t("ui.exposure").toUpperCase());
+        exposedItemsName.setText(Lang.t("ui.items").toUpperCase());
 
         updateGhost();
     }
