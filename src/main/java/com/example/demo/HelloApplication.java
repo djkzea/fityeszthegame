@@ -1,8 +1,11 @@
 package com.example.demo;
 
+import javafx.animation.FadeTransition;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 public class HelloApplication extends Application {
 
@@ -11,14 +14,31 @@ public class HelloApplication extends Application {
 
         GameController controller = new GameController(stage);
 
-        Scene scene = new Scene(
-                controller.getUI().getRoot(),
-                1200,
-                800
+        OpeningScreen opening = new OpeningScreen(
+
+                // NEW GAME: swap the opening page for the game
+                () -> {
+                    Scene scene = stage.getScene();
+                    var gameRoot = controller.getUI().getRoot();
+
+                    gameRoot.setOpacity(0);
+                    scene.setRoot(gameRoot);
+
+                    // Enter / Space = continue, 1-9 = choices
+                    // (installed only now, so keys can't trigger the hidden game on the opening page)
+                    controller.getUI().installKeys(scene);
+
+                    FadeTransition fade = new FadeTransition(Duration.seconds(0.6), gameRoot);
+                    fade.setFromValue(0);
+                    fade.setToValue(1);
+                    fade.play();
+                },
+
+                // EXIT: close the game
+                Platform::exit
         );
 
-        // Enter / Space = continue, 1-9 = choices
-        controller.getUI().installKeys(scene);
+        Scene scene = new Scene(opening.getRoot(), 1200, 800);
 
         stage.setTitle("The Fityesz Chronicle");
         stage.setMinWidth(900);
