@@ -103,6 +103,16 @@ public final class Lang {
         p("ui.title",            "FITYESZ KRÓNIKA", "THE FITYESZ CHRONICLE");
         p("ui.chapter",          "FEJEZET", "CHAPTER");
         p("ui.endOfChapter",     "FEJEZET VÉGE", "END OF CHAPTER");
+        p("ui.newGame",          "Új játék", "New Game");
+        p("ui.loadGame",         "Játék betöltése", "Load Game");
+        p("ui.exit",             "Kilépés", "Exit");
+        p("ui.logIn",            "Bejelentkezés", "Log In");
+        p("ui.signUp",           "Regisztráció", "Sign Up");
+        p("ui.email",            "Email", "Email");
+        p("ui.password",         "Jelszó", "Password");
+        p("ui.noAccount",        "Nincs még fiókod? Regisztrálj", "Don't have an account? Sign up");
+        p("ui.haveAccount",      "Már van fiókod? Jelentkezz be", "Already have an account? Log in");
+        p("ui.fillFields",       "Add meg az emailt és a jelszót.", "Please enter an email and password.");
         p("ui.continue",         "Tovább", "Continue");
         p("ui.yourDecisions",    "A döntéseid", "Your decisions");
         p("ui.nextUp",           "Következik:", "Next up:");
