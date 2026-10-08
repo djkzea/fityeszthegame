@@ -1,0 +1,4 @@
+bejelentkezési felület
+load game
+animációk
+ui szebb
