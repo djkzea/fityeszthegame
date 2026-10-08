@@ -1,0 +1,19 @@
+bejelentkezési felület
+chatlog
+load game
+animációk
+ui szebb
+locationok nem mindig úgy jelennek meg mint az első két fejezetben
+fejezetszám nem jelenik meg
+nincs fehér keret a karakterek neve körül (szövegdoboz teteje, piros)
+választás közben mindig tűnjön el a karakter és a szövegdoboz is, illetve a karakter title cardja (fekete doboz), mint a böngészős verzióban
+többször változzon a karakterek két póza
+summary card: balra igazítottak a keretben lévő statok, szürke a feliratuk, egész fehér kerete vastagabb kell hogy legyen
+az elején a fejezetcím nem prológus a mélypont, hanem fityesz krónika, felugrik az ismeretlen hang mint karakter, de ez nem kell (weboldal)
+a csörög a telefonod külön kell, nem beszélőnek, helyette ismeretlen hang (wboldal)
+fejezetcímek háttere nem pöttyös (kép? vektor?)
+első fejezetben a toborzásban a "lipoti kitesz az asztalra..." résznél ott marad lipoti, és a neve is a szövegdoboz felett de ez nem kell (weboldal)
+wlső fejezetben nem írja ki a megszerzett tárgyat
+első fejezetben kimaradt a lipoti dezső, do you want cofee pálinka both mondat
+legyen egy plusz kattintás a választási lehetőségek előtti mondatnál, mintha új mondat következne, de helyette a választási lehetőségek ugranak fel
+a lipoti smilesnál ottmarad lipoti képe és a neve is, és nem dőlt betűsek, de minden ilyen, ami nem rendes mondat amit egy karakter mond az legyen dőlt
