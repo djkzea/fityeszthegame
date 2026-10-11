@@ -42,8 +42,15 @@ public class GameController {
         this.ui = new GameUI();
 
         ui.setOnGameRestart(this::restartGame);
+    }
 
-        showLanguageSelection();
+    /**
+     * Entered from the title screen's New Game. The language is picked there now,
+     * and the UI was built before that choice, so refresh its labels first.
+     */
+    public void begin() {
+        ui.updateLanguage();
+        showStartScreen();
     }
 
     // ==================================================
@@ -104,36 +111,6 @@ public class GameController {
     // START SCREEN
     // ==================================================
 
-
-    public void showLanguageSelection() {
-
-        ui.showDialogue(
-                "LANGUAGE / NYELV",
-                "Please select your language / Válaszd ki a nyelvet:"
-        );
-
-        ui.clearChoices();
-
-        ui.addChoice(
-                1,
-                "Magyar",
-                () -> {
-                    Lang.set("hu");
-                    ui.updateLanguage();
-                    showStartScreen();
-                }
-        );
-
-        ui.addChoice(
-                2,
-                "English",
-                () -> {
-                    Lang.set("en");
-                    ui.updateLanguage();
-                    showStartScreen();
-                }
-        );
-    }
 
     private void showStartScreen() {
         ui.clearChoices();

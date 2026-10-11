@@ -24,6 +24,9 @@ public class HelloApplication extends Application {
                     gameRoot.setOpacity(0);
                     scene.setRoot(gameRoot);
 
+                    // builds the first screen in whichever language the title screen is set to
+                    controller.begin();
+
                     // Enter / Space = continue, 1-9 = choices
                     // (installed only now, so keys can't trigger the hidden game on the opening page)
                     controller.getUI().installKeys(scene);
