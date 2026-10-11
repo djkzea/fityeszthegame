@@ -1,0 +1,13 @@
+Fonts used by the game UI (GameUI.java, OpeningScreen.java).
+
+All four are licensed under the SIL Open Font License 1.1, which permits
+bundling them with this project. Full licence text:
+https://openfontlicense.org/open-font-license-official-text/
+
+  BebasNeue-Regular.ttf   Bebas Neue      https://fonts.google.com/specimen/Bebas+Neue
+  Archivo-Bold.ttf        Archivo         https://fonts.google.com/specimen/Archivo
+  PublicSans-Regular.ttf  Public Sans     https://fonts.google.com/specimen/Public+Sans
+  PublicSans-Italic.ttf   Public Sans     https://fonts.google.com/specimen/Public+Sans
+
+Downloaded from Google Fonts. Each covers full Hungarian, including o-double-acute
+and u-double-acute, so accented text renders without falling back to another face.

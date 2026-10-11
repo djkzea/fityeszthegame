@@ -1,6 +1,8 @@
 package com.example.demo;
 
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 import javafx.animation.FadeTransition;
 import javafx.animation.ParallelTransition;
@@ -12,37 +14,54 @@ import javafx.beans.binding.DoubleBinding;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
 /**
- * Splash ("FITYESZ CHRONICLE" fades in and out in the middle) followed by the
- * opening page: layered artwork + menu (New Game / Load Game / Exit) on the left.
+ * Splash (the wordmark fades in and out) followed by the opening page:
+ * tricolour rule, wordmark and menu on the left, cast on the right.
+ *
+ * Everything is laid out in a fixed 1200 x 630 design space and scaled as a
+ * whole to whatever the window is, so the composition never drifts apart.
  */
 public class OpeningScreen {
 
-    // Put the four PNGs in src/main/resources/com/example/demo/fityesz_art/opening/
     private static final String ART_DIR  = "/com/example/demo/fityesz_art/opening/";
     private static final String FONT_DIR = "/com/example/demo/fonts/";
 
-    // The artwork layers are all 1200 x 630
+    // the design space; every coordinate below is in these units
     private static final double ART_W = 1200;
     private static final double ART_H = 630;
 
-    private static final String PAGE = "#F4EFE6";
-    private static final String INK  = "#161616";
-    private static final String RED  = "#D20A2E";
-    private static final String GRAY = "#9A9488";
+    private static final String PAGE  = "#F4EFE6";
+    private static final String INK   = "#161616";
+    private static final String RED   = "#C20222";
+    private static final String GREEN = "#206B3A";
+    private static final String GRAY  = "#9A9488";
+
+    // opening_fityesz.png is a 1920 x 1080 sheet - this is the wordmark inside it
+    private static final Rectangle2D LOGO_CROP = new Rectangle2D(276, 323, 1170, 413);
+
+    private static final double BAR_Y = 115;
+    private static final double BAR_H = 10;
+
+    private static final double COL_X = 72;     // left column
+    private static final double LOGO_Y = 236;
+    private static final double LOGO_W = 300;
+    private static final double MENU_Y = 400;
 
     private final StackPane root = new StackPane();
     private final Pane art = new Pane();
@@ -55,6 +74,11 @@ public class OpeningScreen {
     private boolean starting = false;
 
     private final String headFont;
+    private final String labelFont;
+
+    /** the menu entries arrow keys move between */
+    private final List<Button> nav = new ArrayList<>();
+    private int navIndex = 0;
 
     public OpeningScreen(Runnable onNewGame, Runnable onExit) {
 
@@ -62,7 +86,10 @@ public class OpeningScreen {
         this.onExit = onExit;
 
         loadFont("BebasNeue-Regular.ttf");
-        headFont = Font.getFamilies().contains("Bebas Neue") ? "Bebas Neue" : "Impact";
+        loadFont("Archivo-Bold.ttf");
+
+        headFont  = family("Bebas Neue", "Impact");
+        labelFont = family("Archivo", "Arial");
 
         root.setStyle("-fx-background-color: " + PAGE + ";");
 
@@ -71,7 +98,7 @@ public class OpeningScreen {
 
         root.getChildren().addAll(art, splash);
 
-        // keep the 1200x630 artwork fitted (and centered) in any window size
+        // keep the whole 1200x630 composition fitted and centred in any window
         DoubleBinding scale = Bindings.createDoubleBinding(
                 () -> Math.min(root.getWidth() / ART_W, root.getHeight() / ART_H),
                 root.widthProperty(), root.heightProperty());
@@ -83,10 +110,10 @@ public class OpeningScreen {
         art.setOpacity(0);
         art.setMouseTransparent(true);
 
-        // click to skip the splash
         splash.setOnMouseClicked(e -> skipSplash());
 
-        // play once the screen is on a stage
+        root.addEventFilter(KeyEvent.KEY_PRESSED, this::onKey);
+
         root.sceneProperty().addListener((obs, old, scene) -> {
             if (scene != null) {
                 javafx.application.Platform.runLater(this::playSplash);
@@ -108,80 +135,169 @@ public class OpeningScreen {
         art.setPrefSize(ART_W, ART_H);
         art.setMaxSize(ART_W, ART_H);
 
-        ImageView bg      = layer("opening_bg.png");
-        ImageView flag    = layer("opening_flag.png");
-        ImageView people  = layer("opening_people.png");
-        ImageView fityesz = layer("opening_fityesz.png");
+        // the page itself is flat colour (set on root), so only the cast is a bitmap
+        ImageView people = layer("opening_people.png");
 
-        VBox menu = new VBox(6);
-        menu.setLayoutX(72);
-        menu.setLayoutY(400);
-        menu.setPrefWidth(250);
+        ImageView logo = logoView(LOGO_W);
+        logo.setLayoutX(COL_X);
+        logo.setLayoutY(LOGO_Y);
 
-        Button newGame  = menuButton("NEW GAME", true,  this::startNewGame);
-        Button loadGame = menuButton("LOAD GAME", false, null);
-        Button exit     = menuButton("EXIT", true, onExit);
+        // kept short on purpose: the cast artwork starts at x=358 in the design space
+        Label tagline = new Label(spaced(Lang.magyar()
+                ? "POLITIKAI KALANDJÁTÉK"
+                : "A POLITICAL ADVENTURE"));
+        tagline.setFont(Font.font(labelFont, 11));
+        tagline.setStyle("-fx-text-fill: " + GRAY + ";");
+        tagline.setLayoutX(COL_X + 3);
+        tagline.setLayoutY(LOGO_Y + logoHeight(LOGO_W) + 30);
 
-        Label soon = new Label("COMING SOON");
-        soon.setFont(Font.font(headFont, 13));
+        VBox menu = new VBox(4);
+        menu.setLayoutX(COL_X);
+        menu.setLayoutY(MENU_Y);
+        menu.setPrefWidth(260);
+
+        Button newGame  = menuButton(Lang.t("ui.newGame"),  true,  this::startNewGame);
+        Button loadGame = menuButton(Lang.t("ui.loadGame"), false, null);
+        Button exit     = menuButton(Lang.t("ui.exit"),     true,  onExit);
+
+        Label soon = new Label(Lang.magyar() ? "HAMAROSAN" : "COMING SOON");
+        soon.setFont(Font.font(labelFont, 11));
         soon.setStyle("-fx-text-fill: " + GRAY + ";");
-        soon.setPadding(new Insets(0, 0, 0, 22));
-        soon.setTranslateY(-6);
+        soon.setPadding(new Insets(0, 0, 6, 22));
+        soon.setTranslateY(-4);
 
         menu.getChildren().addAll(newGame, loadGame, soon, exit);
 
-        art.getChildren().addAll(bg, flag, people, fityesz, menu);
+        nav.add(newGame);
+        nav.add(exit);
+
+        art.getChildren().addAll(people, tricolourBar(), logo, tagline, menu);
 
         // remembered so the intro animation can stagger them
         art.getProperties().put("people", people);
         art.getProperties().put("menu", menu);
     }
 
+    /** The Hungarian tricolour, drawn rather than scaled from a bitmap so it stays crisp and exact. */
+    private Node tricolourBar() {
+
+        Group bar = new Group();
+        double third = ART_W / 3.0;
+
+        bar.getChildren().addAll(
+                barSegment(0, third, RED),
+                barSegment(third, third, "#FFFFFF"),
+                barSegment(third * 2, third, GREEN));
+
+        bar.setMouseTransparent(true);
+        return bar;
+    }
+
+    private Rectangle barSegment(double x, double width, String colour) {
+
+        Rectangle r = new Rectangle(width, BAR_H, Color.web(colour));
+        r.setX(x);
+        r.setY(BAR_Y);
+        return r;
+    }
+
     private Button menuButton(String text, boolean enabled, Runnable action) {
 
-        Button b = new Button(text);
+        Button b = new Button(text.toUpperCase());
 
-        b.setPrefWidth(250);
+        b.setPrefWidth(260);
         b.setAlignment(Pos.CENTER_LEFT);
-        b.setFont(Font.font(headFont, FontWeight.NORMAL, 34));
+        b.setFont(Font.font(headFont, 34));
         b.setFocusTraversable(enabled);
 
+        // the 4px rule is always there, just transparent when idle, so nothing shifts on hover
         String base = "-fx-background-color: transparent;"
                 + "-fx-background-radius: 0;"
-                + "-fx-padding: 4 12 4 18;"
+                + "-fx-padding: 2 12 2 18;"
                 + "-fx-border-width: 0 0 0 4;"
                 + "-fx-cursor: " + (enabled ? "hand" : "default") + ";";
 
-        String normal = base + "-fx-border-color: transparent;"
+        String idle   = base + "-fx-border-color: transparent;"
                 + "-fx-text-fill: " + (enabled ? INK : GRAY) + ";";
 
-        String hover = base + "-fx-border-color: " + RED + ";"
-                + "-fx-background-color: rgba(255,255,255,0.65);"
+        String active = base + "-fx-border-color: " + RED + ";"
                 + "-fx-text-fill: " + RED + ";";
 
-        b.setStyle(normal);
+        b.setStyle(idle);
 
         if (!enabled) {
-            b.setDisable(false);        // keep full gray look instead of JavaFX's faded disabled look
             b.setOpacity(0.85);
-            b.setOnAction(e -> { });
             return b;
         }
 
-        b.setOnMouseEntered(e -> b.setStyle(hover));
-        b.setOnMouseExited(e -> b.setStyle(b.isFocused() ? hover : normal));
-        b.focusedProperty().addListener((o, was, is) -> b.setStyle(is ? hover : normal));
-
+        b.setOnMouseEntered(e -> focus(b));
         b.setOnAction(e -> action.run());
 
-        b.setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.ENTER) {
-                b.fire();
-                e.consume();
+        b.focusedProperty().addListener((o, was, is) -> {
+            b.setStyle(is ? active : idle);
+            slide(b, is ? 6 : 0);
+            if (is) {
+                navIndex = Math.max(0, nav.indexOf(b));
             }
         });
 
         return b;
+    }
+
+    private void slide(Node node, double to) {
+
+        TranslateTransition t = new TranslateTransition(Duration.millis(140), node);
+        t.setToX(to);
+        t.play();
+    }
+
+    private void focus(Button b) {
+
+        if (!b.isFocused()) {
+            b.requestFocus();
+        }
+    }
+
+    // ==========================================
+    // KEYS
+    // ==========================================
+
+    private void onKey(KeyEvent e) {
+
+        // any key gets past the splash
+        if (!splashDone) {
+            skipSplash();
+            e.consume();
+            return;
+        }
+
+        switch (e.getCode()) {
+            case UP, LEFT -> {
+                move(-1);
+                e.consume();
+            }
+            case DOWN, RIGHT -> {
+                move(1);
+                e.consume();
+            }
+            case ENTER, SPACE -> {
+                if (!nav.isEmpty()) {
+                    nav.get(navIndex).fire();
+                }
+                e.consume();
+            }
+            default -> { }
+        }
+    }
+
+    private void move(int step) {
+
+        if (nav.isEmpty()) {
+            return;
+        }
+
+        navIndex = Math.floorMod(navIndex + step, nav.size());
+        nav.get(navIndex).requestFocus();
     }
 
     // ==========================================
@@ -192,22 +308,16 @@ public class OpeningScreen {
 
         splash.setStyle("-fx-background-color: " + PAGE + ";");
 
-        Image img = loadImage("opening_fityesz.png");
+        ImageView logo = logoView(460);
 
-        if (img == null) {
+        if (logo.getImage() == null) {
             return;
         }
-
-        // the logo sits on the left of the PNG - crop to just the logo, then center it
-        ImageView logo = new ImageView(img);
-        logo.setViewport(new Rectangle2D(60, 262, 250, 104));
-        logo.setPreserveRatio(true);
-        logo.setSmooth(true);
-        logo.setFitWidth(500);
 
         logo.setOpacity(0);
 
         splash.getChildren().add(logo);
+        splash.setAlignment(Pos.CENTER);
         splash.getProperties().put("logo", logo);
     }
 
@@ -215,13 +325,18 @@ public class OpeningScreen {
 
         Node logo = (Node) splash.getProperties().get("logo");
 
-        FadeTransition in = new FadeTransition(Duration.seconds(1.4), logo);
+        if (logo == null) {
+            revealOpeningPage();
+            return;
+        }
+
+        FadeTransition in = new FadeTransition(Duration.seconds(1.2), logo);
         in.setFromValue(0);
         in.setToValue(1);
 
-        PauseTransition hold = new PauseTransition(Duration.seconds(1.3));
+        PauseTransition hold = new PauseTransition(Duration.seconds(1.1));
 
-        FadeTransition out = new FadeTransition(Duration.seconds(1.4), logo);
+        FadeTransition out = new FadeTransition(Duration.seconds(1.0), logo);
         out.setFromValue(1);
         out.setToValue(0);
 
@@ -248,7 +363,6 @@ public class OpeningScreen {
         }
         splashDone = true;
 
-        // splash fades away, opening page fades in
         FadeTransition splashOut = new FadeTransition(Duration.seconds(0.6), splash);
         splashOut.setFromValue(splash.getOpacity());
         splashOut.setToValue(0);
@@ -258,7 +372,7 @@ public class OpeningScreen {
         artIn.setFromValue(0);
         artIn.setToValue(1);
 
-        // people drift in slightly from the right, menu from the left
+        // the cast drifts in from the right, the menu from the left
         Node people = (Node) art.getProperties().get("people");
         Node menu = (Node) art.getProperties().get("menu");
 
@@ -271,7 +385,14 @@ public class OpeningScreen {
         menuSlide.setToX(0);
 
         ParallelTransition all = new ParallelTransition(splashOut, artIn, peopleSlide, menuSlide);
-        all.setOnFinished(e -> art.setMouseTransparent(false));
+
+        all.setOnFinished(e -> {
+            art.setMouseTransparent(false);
+            if (!nav.isEmpty()) {
+                nav.get(0).requestFocus();
+            }
+        });
+
         all.play();
     }
 
@@ -297,6 +418,49 @@ public class OpeningScreen {
     // RESOURCES
     // ==========================================
 
+    /** The wordmark, cropped out of its sheet and scaled to the requested width. */
+    private ImageView logoView(double fitWidth) {
+
+        ImageView view = new ImageView();
+        Image img = loadImage("opening_fityesz.png");
+
+        if (img != null) {
+            view.setImage(img);
+            view.setViewport(LOGO_CROP);
+        }
+
+        view.setPreserveRatio(true);
+        view.setSmooth(true);
+        view.setFitWidth(fitWidth);
+        view.setMouseTransparent(true);
+
+        return view;
+    }
+
+    private static double logoHeight(double fitWidth) {
+        return fitWidth * LOGO_CROP.getHeight() / LOGO_CROP.getWidth();
+    }
+
+    /** JavaFX has no letter-spacing, so hair spaces stand in for it on the small caps label. */
+    private static String spaced(String text) {
+
+        StringBuilder out = new StringBuilder(text.length() * 2);
+
+        for (int i = 0; i < text.length(); i++) {
+            out.append(text.charAt(i));
+            if (i < text.length() - 1) {
+                out.append(' ');
+            }
+        }
+
+        return out.toString();
+    }
+
+    /**
+     * A full-width layer. Only the width is pinned - the height follows the image's
+     * own ratio, so an asset that isn't exactly 1200x630 lands square on the left
+     * edge instead of being quietly shrunk away from it.
+     */
     private ImageView layer(String file) {
 
         Image img = loadImage(file);
@@ -306,9 +470,8 @@ public class OpeningScreen {
             view.setImage(img);
         }
 
-        view.setFitWidth(ART_W);
-        view.setFitHeight(ART_H);
         view.setPreserveRatio(true);
+        view.setFitWidth(ART_W);
         view.setSmooth(true);
         view.setMouseTransparent(true);
 
@@ -338,5 +501,9 @@ public class OpeningScreen {
             }
         } catch (Exception ignored) {
         }
+    }
+
+    private static String family(String wanted, String fallback) {
+        return Font.getFamilies().contains(wanted) ? wanted : fallback;
     }
 }
