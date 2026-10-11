@@ -147,6 +147,8 @@ public final class Lang {
         p("ui.pressfound",       "A sajtó mindent kiderített.", "The press has uncovered everything.");
         p("ui.enter",            "[ Nyomj Enter-t a folytatáshoz... ]", "[ Press Enter to continue... ]");
         p("ui.you",              "Te", "You");
+        p("ui.controls",         "Enter tovább · 1-3 válasz · Esc szünet",
+                                 "Enter continue · 1-3 answer · Esc pause");
         p("ui.footer", "Fityesz Krónika · Szöveges kalandjáték", "Fityesz Chronicle · Text adventure game");
 
         // ── Szereplok / Speakers ───────────────────────────────────────────

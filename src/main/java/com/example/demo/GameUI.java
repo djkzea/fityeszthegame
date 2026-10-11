@@ -170,6 +170,7 @@ public class GameUI {
     private final Text shownText = new Text();
     private final Text pendingText = new Text();
     private final Label hintLabel;
+    private final Label controlsHint;
 
     // choices
     private final VBox choicesPanel;
@@ -913,6 +914,15 @@ public class GameUI {
         });
 
         root.setCenter(stagePane);
+
+        // The hint inside the dialogue box only appears while the game is waiting on
+        // Enter, so the pause key would be advertised barely half the time. This one
+        // is always there, the way the site keeps its controls line under the panel.
+        controlsHint = new Label(spaced(Lang.t("ui.controls").toUpperCase()));
+        controlsHint.setFont(label(9.5));
+        controlsHint.setTextFill(Color.web(GRAY));
+        controlsHint.setPadding(new Insets(9, 18, 11, 18));
+        root.setBottom(controlsHint);
 
         updateGhost();
     }
@@ -2218,6 +2228,7 @@ public class GameUI {
         }
 
         restartButton.setText(Lang.t("ui.restart"));
+        controlsHint.setText(spaced(Lang.t("ui.controls").toUpperCase()));
         xpName.setText(Lang.t("ui.xp").toUpperCase());
         exposureName.setText(Lang.t("ui.exposure").toUpperCase());
         itemsName.setText(Lang.t("ui.items").toUpperCase());
