@@ -36,12 +36,12 @@ public class HelloApplication extends Application {
     private static final String RED   = "#C8102E";
 
     private static final String DISCLAIMER_HU =
-            "A filmben szereplő személyek és események kitaláltak. "
+            "A játékban szereplő személyek és események kitaláltak. "
             + "Bármilyen hasonlóság valós személyekkel vagy eseményekkel "
             + "csupán a véletlen műve.";
 
     private static final String DISCLAIMER_EN =
-            "The characters and events depicted in this film are fictitious. "
+            "The characters and events depicted in this game are fictitious. "
             + "Any similarity to actual persons, living or dead, is purely coincidental.";
 
     /**
