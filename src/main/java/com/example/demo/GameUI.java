@@ -347,7 +347,7 @@ public class GameUI {
         exposureBar = new Bar(100, 10, RED, true);
         exposureValue = statSmall("0/100");
         HBox exposureBox = new HBox(9, exposureName, exposureBar, exposureValue);
-        exposureBox.setAlignment(Pos.CENTER);
+        exposureBox.setAlignment(Pos.BASELINE_LEFT);
 
         itemsName = statName(Lang.t("ui.items"));
         itemsValue = statValue("0");
@@ -364,8 +364,11 @@ public class GameUI {
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
 
+        // Baseline, not centre: the XP and items groups are as tall as their 20px
+        // number while the exposure group is only as tall as its label, so centring
+        // each group put them on three slightly different lines.
         HBox headerRow = new HBox(28, titleBox, headerSpacer, xpBox, exposureBox, itemsBox, restartButton);
-        headerRow.setAlignment(Pos.CENTER_LEFT);
+        headerRow.setAlignment(Pos.BASELINE_LEFT);
         headerRow.setPadding(new Insets(14, 24, 12, 16));
 
         // thin progress line under the header
