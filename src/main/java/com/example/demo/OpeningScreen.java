@@ -24,11 +24,15 @@ import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextBoundsType;
 import javafx.scene.transform.Scale;
 import javafx.util.Duration;
 
@@ -59,9 +63,16 @@ public class OpeningScreen {
     private static final String GRAY  = "#9A9488";
     private static final String RULE  = "#DFD7C8";
 
-    // the wordmark inside the 1920x1080 sheet, and the cast inside its 1200x630 sheet
-    private static final Rectangle2D LOGO_CROP = new Rectangle2D(276, 323, 1170, 413);
+    // the cast inside its 1200x630 sheet
     private static final Rectangle2D CAST_CROP = new Rectangle2D(358, 180, 789, 335);
+
+    // Lockup geometry, measured off the original artwork and expressed as fractions
+    // of the lockup width, so it holds at any size.
+    private static final double SUB_X    = 0.4427;             // subtitle left edge
+    private static final double SUB_BASE = 0.3504;             // subtitle baseline
+    private static final double SUB_W    = 0.4803;             // subtitle width
+    private static final double SUB_H    = 0.1162;             // subtitle glyph height
+    private static final double SUB_MAX  = 0.5560;             // subtitle may run to the mark's right edge
 
     private final StackPane root = new StackPane();
     private final StackPane splash = new StackPane();
@@ -224,7 +235,7 @@ public class OpeningScreen {
         col.setMaxWidth(COL_W + COL_PAD);
         col.setFillWidth(true);
 
-        ImageView logo = logoView(290);
+        Pane logo = lockup(290);
 
         Label tagline = new Label(spaced(Lang.magyar()
                 ? "POLITIKAI KALANDJÁTÉK"
@@ -252,11 +263,14 @@ public class OpeningScreen {
         hint.setFont(Font.font(labelFont, 9));
         hint.setStyle("-fx-text-fill: " + GRAY + ";");
 
+        Node languages = languageToggle();
+
         VBox.setMargin(tagline, new Insets(16, 0, 0, 3));
         VBox.setMargin(menu, new Insets(38, 0, 0, 0));
         VBox.setMargin(hint, new Insets(24, 0, 0, 3));
+        VBox.setMargin(languages, new Insets(14, 0, 0, 3));
 
-        col.getChildren().addAll(logo, tagline, menu, hint);
+        col.getChildren().addAll(logo, tagline, menu, hint, languages);
 
         // Scaled as one block so the type keeps its proportions in any window.
         // The pivot is pinned to the left edge (and the vertical middle) because
@@ -368,6 +382,63 @@ public class OpeningScreen {
         t.play();
     }
 
+    /** Language picker. Without one the opening page could only ever be Hungarian. */
+    private Node languageToggle() {
+
+        HBox box = new HBox(7);
+        box.setAlignment(Pos.CENTER_LEFT);
+
+        Label slash = new Label("/");
+        slash.setFont(Font.font(labelFont, 9));
+        slash.setStyle("-fx-text-fill: " + GRAY + ";");
+
+        box.getChildren().addAll(langLabel("MAGYAR", Lang.HU), slash, langLabel("ENGLISH", Lang.EN));
+
+        return box;
+    }
+
+    private Label langLabel(String text, String code) {
+
+        boolean active = Lang.kod().equals(code);
+
+        Label l = new Label(spaced(text));
+        l.setFont(Font.font(labelFont, 9));
+        l.setStyle("-fx-text-fill: " + (active ? RED : GRAY) + ";"
+                + "-fx-cursor: " + (active ? "default" : "hand") + ";");
+
+        if (!active) {
+            l.setOnMouseClicked(e -> switchLanguage(code));
+        }
+
+        return l;
+    }
+
+    /** Swaps the language and rebuilds the column, so the wordmark and the menu follow it. */
+    private void switchLanguage(String code) {
+
+        if (Lang.kod().equals(code)) {
+            return;
+        }
+
+        Lang.set(code);
+
+        nav.clear();
+        selected = null;
+
+        Node old = column;
+        int at = root.getChildren().indexOf(old);
+
+        column = buildColumn();
+        column.setOpacity(old.getOpacity());
+        StackPane.setAlignment(column, Pos.CENTER_LEFT);
+
+        root.getChildren().set(at, column);
+
+        if (!nav.isEmpty()) {
+            select(nav.get(0));
+        }
+    }
+
     // ==========================================
     // KEYS
     // ==========================================
@@ -422,12 +493,7 @@ public class OpeningScreen {
         splash.setStyle("-fx-background-color: " + PAGE + ";");
         splash.setAlignment(Pos.CENTER);
 
-        ImageView logo = logoView(460);
-
-        if (logo.getImage() == null) {
-            return;
-        }
-
+        Pane logo = lockup(460);
         logo.setOpacity(0);
 
         splash.getChildren().add(logo);
@@ -541,23 +607,106 @@ public class OpeningScreen {
     // RESOURCES
     // ==========================================
 
-    /** The wordmark, cropped out of its sheet and scaled to the requested width. */
-    private ImageView logoView(double fitWidth) {
+    /**
+     * The full lockup: the F + FITYESZ bitmap with the subtitle set in type under it.
+     *
+     * The Hungarian and English logos differ by exactly one word, and the English
+     * one only ever existed baked into a 240px composite - too small to scale up.
+     * Setting that word in Bebas Neue instead gives both languages crisply at any
+     * size from one asset. It is auto-sized to the width the original KRÓNIKA had,
+     * so a longer word like CHRONICLE sets smaller rather than overrunning the mark.
+     */
+    private Pane lockup(double width) {
 
-        ImageView view = new ImageView();
-        Image img = loadImage("opening_fityesz.png");
+        Pane p = new Pane();
+
+        double height = width * SUB_BASE + width * 0.012;
+        p.setPrefSize(width, height);
+        p.setMinSize(width, height);
+        p.setMaxSize(width, height);
+        p.setMouseTransparent(true);
+
+        ImageView mark = new ImageView();
+        Image img = loadImage("opening_wordmark.png");
 
         if (img != null) {
-            view.setImage(img);
-            view.setViewport(LOGO_CROP);
+            mark.setImage(img);
         }
 
-        view.setPreserveRatio(true);
-        view.setSmooth(true);
-        view.setFitWidth(fitWidth);
-        view.setMouseTransparent(true);
+        mark.setPreserveRatio(true);
+        mark.setSmooth(true);
+        mark.setFitWidth(width);
 
-        return view;
+        p.getChildren().add(mark);
+        addSubtitle(p, width);
+
+        return p;
+    }
+
+    /**
+     * Sets the subtitle to the proportions the original artwork had: the glyphs are
+     * sized by its height and the leftover width is spread between the letters as
+     * tracking, rather than stretched into the glyphs. A longer word (CHRONICLE)
+     * simply sets smaller instead of overrunning the mark.
+     */
+    private void addSubtitle(Pane p, double width) {
+
+        String word = Lang.magyar() ? "KRÓNIKA" : "CHRONICLE";
+
+        double minW = width * SUB_W;        // the width the original KRÓNIKA had
+        double maxW = width * SUB_MAX;      // flush with the right edge of FITYESZ
+        double targetH = width * SUB_H;
+
+        // size from the height first
+        Text probe = new Text(word);
+        probe.setBoundsType(TextBoundsType.VISUAL);
+        probe.setFont(Font.font(headFont, 100));
+
+        double inkH = probe.getLayoutBounds().getHeight();
+        double size = inkH > 0 ? 100 * targetH / inkH : 40;
+
+        double[] advance = new double[word.length()];
+        double natural = measure(word, size, advance);
+
+        // only shrink once a longer word has used up the room out to the right edge
+        if (natural > maxW && natural > 0) {
+            size *= maxW / natural;
+            natural = measure(word, size, advance);
+        }
+
+        double allowed = Math.max(minW, Math.min(maxW, natural));
+        double track = word.length() > 1 ? (allowed - natural) / (word.length() - 1) : 0;
+        Font font = Font.font(headFont, size);
+
+        double x = width * SUB_X;
+
+        for (int i = 0; i < word.length(); i++) {
+
+            Text t = new Text(String.valueOf(word.charAt(i)));
+            t.setFont(font);
+            t.setFill(Color.web(RED));
+            t.setX(x);
+            t.setY(width * SUB_BASE);
+
+            p.getChildren().add(t);
+            x += advance[i] + track;
+        }
+    }
+
+    /** Fills in each glyph's advance at this size and returns their total. */
+    private double measure(String word, double size, double[] advance) {
+
+        Font font = Font.font(headFont, size);
+        double total = 0;
+
+        for (int i = 0; i < word.length(); i++) {
+            Text t = new Text(String.valueOf(word.charAt(i)));
+            t.setFont(font);
+            advance[i] = t.getLayoutBounds().getWidth();
+            total += advance[i];
+        }
+
+        return total;
     }
 
     private Image loadImage(String file) {
