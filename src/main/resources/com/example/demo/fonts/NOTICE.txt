@@ -1,11 +1,13 @@
 Fonts used by the game UI (GameUI.java, OpeningScreen.java).
 
-All four are licensed under the SIL Open Font License 1.1, which permits
-bundling them with this project. Full licence text:
+These are the two families fityeszthegame.com itself uses: Antonio for display
+type and Public Sans for everything else, so the desktop build matches the site.
+
+All are licensed under the SIL Open Font License 1.1, which permits bundling
+them with this project. Full licence text:
 https://openfontlicense.org/open-font-license-official-text/
 
-  BebasNeue-Regular.ttf   Bebas Neue      https://fonts.google.com/specimen/Bebas+Neue
-  Archivo-Bold.ttf        Archivo         https://fonts.google.com/specimen/Archivo
+  Antonio-Bold.ttf        Antonio         https://fonts.google.com/specimen/Antonio
   PublicSans-Regular.ttf  Public Sans     https://fonts.google.com/specimen/Public+Sans
   PublicSans-Italic.ttf   Public Sans     https://fonts.google.com/specimen/Public+Sans
 

@@ -1,6 +1,7 @@
 package com.example.demo;
 
 import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.ParallelTransition;
@@ -65,13 +66,19 @@ public class GameUI {
     // COLORS
     // =========================================================
 
-    private static final String PAPER = "#FAF7F0";
-    private static final String PAGE = "#F1EDE3";
-    private static final String INK = "#161616";
-    private static final String RED = "#D20A2E";
-    private static final String GREEN = "#2F6B45";
-    private static final String GRAY = "#6D6D6D";
-    private static final String TRACK = "#E4DDCF";
+    // Palette and motion below are the site's own design tokens, read off
+    // fityeszthegame.com so the desktop build and the web build match.
+    private static final String PAPER = "#FBF8F2";   // --sheet
+    private static final String PAGE = "#F4EFE6";    // --paper
+    private static final String INK = "#161616";     // --ink
+    private static final String RED = "#C8102E";     // --accent
+    private static final String GREEN = "#1F6B3A";   // --second
+    private static final String GRAY = "#4A4640";    // --inkSoft
+    private static final String TRACK = "#CFC6B6";   // --line
+
+    /** the site's standard ease-out, cubic-bezier(.2,.7,.2,1) */
+    private static final Interpolator EASE = Interpolator.SPLINE(0.2, 0.7, 0.2, 1);
+
 
     // =========================================================
     // FONTS
@@ -86,13 +93,12 @@ public class GameUI {
     private static final String BODY;   // dialogue text
 
     static {
-        loadFont("BebasNeue-Regular.ttf");
-        loadFont("Archivo-Bold.ttf");
+        loadFont("Antonio-Bold.ttf");
         loadFont("PublicSans-Regular.ttf");
         loadFont("PublicSans-Italic.ttf");
 
-        HEAD = pickFamily("Bebas Neue", "Impact");
-        LABEL = pickFamily("Archivo", "Arial");
+        HEAD = pickFamily("Antonio", "Arial Narrow");
+        LABEL = pickFamily("Public Sans", "Arial");
         BODY = pickFamily("Public Sans", "Segoe UI");
     }
 
@@ -1181,9 +1187,21 @@ public class GameUI {
         if (!titleCard.isVisible()) {
             setShown(titleCard, true);
             titleCard.setOpacity(0);
-            FadeTransition fade = new FadeTransition(Duration.millis(380), titleCard);
+            titleCard.setScaleX(1.18);
+            titleCard.setScaleY(1.18);
+
+            FadeTransition fade = new FadeTransition(Duration.millis(800), titleCard);
             fade.setToValue(1);
-            fade.play();
+            fade.setInterpolator(EASE);
+
+            ScaleTransition settle = new ScaleTransition(Duration.millis(800), titleCard);
+            settle.setToX(1);
+            settle.setToY(1);
+            settle.setInterpolator(EASE);
+
+            ParallelTransition slam = new ParallelTransition(fade, settle);
+            slam.setDelay(Duration.millis(120));
+            slam.play();
         }
 
         updateGhost();
@@ -1252,9 +1270,15 @@ public class GameUI {
         if (!summaryCard.isVisible()) {
             setShown(summaryCard, true);
             summaryCard.setOpacity(0);
-            FadeTransition fade = new FadeTransition(Duration.millis(380), summaryCard);
+            summaryCard.setTranslateY(10);
+
+            FadeTransition fade = new FadeTransition(Duration.millis(400), summaryCard);
             fade.setToValue(1);
-            fade.play();
+
+            TranslateTransition rise = new TranslateTransition(Duration.millis(400), summaryCard);
+            rise.setToY(0);
+
+            new ParallelTransition(fade, rise).play();
         }
 
         updateGhost();
@@ -1334,13 +1358,15 @@ public class GameUI {
 
         if (panel && !panelWasVisible) {
             choicesPanel.setOpacity(0);
-            choicesPanel.setTranslateY(14);
+            choicesPanel.setTranslateY(12);
 
-            FadeTransition fade = new FadeTransition(Duration.millis(240), choicesPanel);
+            FadeTransition fade = new FadeTransition(Duration.millis(300), choicesPanel);
             fade.setToValue(1);
+            fade.setInterpolator(EASE);
 
-            TranslateTransition slide = new TranslateTransition(Duration.millis(240), choicesPanel);
+            TranslateTransition slide = new TranslateTransition(Duration.millis(300), choicesPanel);
             slide.setToY(0);
+            slide.setInterpolator(EASE);
 
             new ParallelTransition(fade, slide).play();
         }
@@ -1514,7 +1540,7 @@ public class GameUI {
     private void styleChoice(Button button, Label numberBox, boolean hover) {
 
         button.setStyle(
-                "-fx-background-color: " + (hover ? INK : "#F1EDE3") + ";" +
+                "-fx-background-color: " + (hover ? INK : PAGE) + ";" +
                         "-fx-background-radius: 0;" +
                         "-fx-border-color: " + INK + ";" +
                         "-fx-border-width: 1;" +
@@ -2022,22 +2048,32 @@ public class GameUI {
 
         setShown(itemPopup, true);
         itemPopup.setOpacity(0);
-        itemPopup.setScaleX(0.7);
-        itemPopup.setScaleY(0.7);
+        itemPopup.setScaleX(1.9);
+        itemPopup.setScaleY(1.9);
 
-        ScaleTransition scale = new ScaleTransition(Duration.millis(260), itemPopup);
-        scale.setToX(1);
-        scale.setToY(1);
-
-        FadeTransition in = new FadeTransition(Duration.millis(200), itemPopup);
-        in.setToValue(1);
+        // The site stamps this in with an overshoot curve. A JavaFX spline cannot
+        // express it - control points are clamped to [0,1] - so these are the
+        // site's own keyframes instead: 1.9 oversize, past the mark to 0.95 at
+        // 65%, then settling on 1.
+        Timeline stamp = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(itemPopup.scaleXProperty(), 1.9),
+                        new KeyValue(itemPopup.scaleYProperty(), 1.9),
+                        new KeyValue(itemPopup.opacityProperty(), 0)),
+                new KeyFrame(Duration.millis(390),
+                        new KeyValue(itemPopup.scaleXProperty(), 0.95, EASE),
+                        new KeyValue(itemPopup.scaleYProperty(), 0.95, EASE),
+                        new KeyValue(itemPopup.opacityProperty(), 1)),
+                new KeyFrame(Duration.millis(600),
+                        new KeyValue(itemPopup.scaleXProperty(), 1, EASE),
+                        new KeyValue(itemPopup.scaleYProperty(), 1, EASE)));
 
         PauseTransition hold = new PauseTransition(Duration.millis(1900));
 
         FadeTransition out = new FadeTransition(Duration.millis(350), itemPopup);
         out.setToValue(0);
 
-        itemAnim = new SequentialTransition(new ParallelTransition(scale, in), hold, out);
+        itemAnim = new SequentialTransition(stamp, hold, out);
         itemAnim.setOnFinished(e -> finishItem());
         itemAnim.play();
     }

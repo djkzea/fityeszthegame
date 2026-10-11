@@ -56,12 +56,14 @@ public class OpeningScreen {
     private static final double COL_PAD = 72;    // page margin, in design units
     private static final double COL_W = 352;     // column content width
 
-    private static final String PAGE  = "#F4EFE6";
-    private static final String INK   = "#161616";
-    private static final String RED   = "#C20222";
-    private static final String GREEN = "#206B3A";
-    private static final String GRAY  = "#9A9488";
-    private static final String RULE  = "#DFD7C8";
+    // the site's design tokens, read off fityeszthegame.com
+    private static final String PAGE     = "#F4EFE6";   // --paper
+    private static final String INK      = "#161616";   // --ink
+    private static final String RED      = "#C8102E";   // --accent
+    private static final String RED_TEXT = "#B10E28";   // --accentText, the logo subtitle
+    private static final String GREEN    = "#1F6B3A";   // --second
+    private static final String GRAY     = "#4A4640";   // --inkSoft
+    private static final String RULE     = "#CFC6B6";   // --line
 
     // the cast inside its 1200x630 sheet
     private static final Rectangle2D CAST_CROP = new Rectangle2D(358, 180, 789, 335);
@@ -105,11 +107,11 @@ public class OpeningScreen {
         this.onNewGame = onNewGame;
         this.onExit = onExit;
 
-        loadFont("BebasNeue-Regular.ttf");
-        loadFont("Archivo-Bold.ttf");
+        loadFont("Antonio-Bold.ttf");
+        loadFont("PublicSans-Regular.ttf");
 
-        headFont  = family("Bebas Neue", "Impact");
-        labelFont = family("Archivo", "Arial");
+        headFont  = family("Antonio", "Arial Narrow");
+        labelFont = family("Public Sans", "Arial");
 
         root.setStyle("-fx-background-color: " + PAGE + ";");
 
@@ -610,7 +612,7 @@ public class OpeningScreen {
      *
      * The Hungarian and English logos differ by exactly one word, and the English
      * one only ever existed baked into a 240px composite - too small to scale up.
-     * Setting that word in Bebas Neue instead gives both languages crisply at any
+     * Setting that word in Antonio instead gives both languages crisply at any
      * size from one asset. It is auto-sized to the width the original KRÓNIKA had,
      * so a longer word like CHRONICLE sets smaller rather than overrunning the mark.
      */
@@ -682,7 +684,7 @@ public class OpeningScreen {
 
             Text t = new Text(String.valueOf(word.charAt(i)));
             t.setFont(font);
-            t.setFill(Color.web(RED));
+            t.setFill(Color.web(RED_TEXT));
             t.setX(x);
             t.setY(width * SUB_BASE);
 
