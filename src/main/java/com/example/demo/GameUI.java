@@ -587,6 +587,15 @@ public class GameUI {
         playerHpColumn.setMaxWidth(Double.MAX_VALUE);
         bossHpColumn.setMaxWidth(Double.MAX_VALUE);
 
+        // A column is otherwise as wide as its label, and the label gets narrower
+        // as the health loses a digit - which moved both bars on every hit. Pinning
+        // the preferred width to zero makes the two halves split the row evenly and
+        // hold still whatever the numbers say.
+        playerHpColumn.setMinWidth(0);
+        playerHpColumn.setPrefWidth(0);
+        bossHpColumn.setMinWidth(0);
+        bossHpColumn.setPrefWidth(0);
+
         HBox hpRow = new HBox(20, playerHpColumn, bossHpColumn);
 
         bossArea = new VBox(6, bossNameLabel, hpRow, abilitiesBox);
