@@ -155,6 +155,27 @@ public class OpeningScreen {
         return root;
     }
 
+    /**
+     * Shows the poster straight away, with no splash. Used when coming back out of
+     * the game - the wordmark has been seen already and replaying it would make
+     * leaving a game feel like relaunching the app.
+     */
+    public void showPosterNow() {
+
+        splashDone = true;
+        splash.setVisible(false);
+        splash.setOpacity(0);
+
+        plate.setOpacity(1);
+        bar.setOpacity(1);
+        cast.setOpacity(1);
+        column.setOpacity(1);
+
+        if (!nav.isEmpty()) {
+            select(nav.get(0));
+        }
+    }
+
     // ==========================================
     // POSTER
     // ==========================================
@@ -503,6 +524,10 @@ public class OpeningScreen {
     }
 
     private void playSplash() {
+
+        if (splashDone) {
+            return;
+        }
 
         Node logo = (Node) splash.getProperties().get("logo");
 

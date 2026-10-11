@@ -1642,6 +1642,12 @@ public class GameUI {
 
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
 
+            // the filter lives on the scene, but the game does not always occupy it -
+            // while the title screen or a menu is up, these keys are not ours
+            if (root.getScene() == null) {
+                return;
+            }
+
             KeyCode code = event.getCode();
 
             // early-ending card: swallow keys so nobody restarts by accident

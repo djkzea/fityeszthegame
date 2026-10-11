@@ -50,7 +50,8 @@ public class GameController {
      */
     public void begin() {
         ui.updateLanguage();
-        showStartScreen();
+        // full reset, so coming back out to the menu and starting again is a clean run
+        restartGame();
     }
 
     // ==================================================
