@@ -596,11 +596,9 @@ public class OpeningScreen {
         }
         starting = true;
 
-        FadeTransition fade = new FadeTransition(Duration.seconds(0.6), root);
-        fade.setFromValue(1);
-        fade.setToValue(0);
-        fade.setOnFinished(e -> onNewGame.run());
-        fade.play();
+        // the shell drops its curtain over this page; fading it out here as well
+        // would just wash the page to nothing first
+        onNewGame.run();
     }
 
     // ==========================================
