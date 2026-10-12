@@ -102,6 +102,7 @@ public final class Lang {
         // ── Kezelofelulet / UI chrome ──────────────────────────────────────
         p("ui.title",            "FITYESZ KRÓNIKA", "THE FITYESZ CHRONICLE");
         p("ui.chapter",          "FEJEZET", "CHAPTER");
+        p("ui.prologue",         "PROLÓGUS", "PROLOGUE");
         p("ui.endOfChapter",     "FEJEZET VÉGE", "END OF CHAPTER");
         p("ui.newGame",          "Új játék", "New Game");
         p("ui.loadGame",         "Játék betöltése", "Load Game");
@@ -202,6 +203,7 @@ public final class Lang {
 
         // ── Prologus / Prologue ────────────────────────────────────────────
         p("pro.title",           "Prológus: A mélyPont", "Prologue: Rock Bottom");
+        p("pro.name",            "A mélypont", "Rock Bottom");
         p("pro.quote",           "Aki a múltat nem ismeri, az a jövőt sem érti.",
                 "He who does not know the past cannot understand the future.");
         p("pro.namePrompt",      "Add meg a neved: ", "Enter your name: ");

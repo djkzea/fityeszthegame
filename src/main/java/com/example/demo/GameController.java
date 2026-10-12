@@ -113,10 +113,29 @@ public class GameController {
     // ==================================================
 
 
+    /**
+     * The header line, as the web build writes it: "PROLÓGUS · A MÉLYPONT",
+     * "1. FEJEZET · A TOBORZÁS", "CHAPTER 1 · THE RECRUITMENT". Nothing called
+     * setChapter before, which is why the header kept saying FITYESZ KRÓNIKA and
+     * the chapter number never appeared at all.
+     */
+    private void setChapterHeader(int chapter, String title) {
+
+        String prefix = chapter == 0
+                ? Lang.t("ui.prologue")
+                : Lang.magyar()
+                        ? chapter + ". " + Lang.t("ui.chapter")
+                        : Lang.t("ui.chapter") + " " + chapter;
+
+        ui.setChapter(prefix + " · " + title);
+    }
+
     private void showStartScreen() {
         ui.clearChoices();
 
         ui.hideRestartButton();
+
+        setChapterHeader(0, Lang.t("pro.name"));
 
         ui.showDialogue(
                 Lang.t("ui.title"),
@@ -161,7 +180,7 @@ public class GameController {
         ui.clearChoices();
 
         ui.showDialogue(
-                Lang.t("npc.unknown"),
+                "",
                 Lang.t("pro.teacher") + "\n\n"
                         + Lang.t("pro.salary") + "\n\n"
                         + Lang.t("pro.assets")
@@ -174,7 +193,7 @@ public class GameController {
         ui.clearChoices();
 
         ui.showDialogue(
-                Lang.t("npc.unknown"),
+                "",
                 Lang.t("pro.bank") + "\n\n"
                         + Lang.t("pro.politician")
         );
@@ -185,8 +204,17 @@ public class GameController {
     private void prologuePhone() {
         ui.clearChoices();
 
+        // the phone ringing is something that happens, not something anyone says
+        ui.showDialogue("", Lang.t("pro.phone"));
+
+        ui.addChoice(1, Lang.t("ui.enter"), this::prologueCall);
+    }
+
+    private void prologueCall() {
+        ui.clearChoices();
+
         ui.showDialogue(
-                Lang.t("pro.phone"),
+                Lang.t("npc.unknown"),
                 Lang.t("pro.call", state.getName())
         );
 
@@ -198,6 +226,7 @@ public class GameController {
     // ==================================================
 
     private void chapter1() {
+        setChapterHeader(1, Lang.t("ch1.title"));
         ui.clearChoices();
 
         ui.showImage(
@@ -436,6 +465,7 @@ public class GameController {
     // ==================================================
 
     private void chapter2() {
+        setChapterHeader(2, Lang.t("ch2.title"));
         ui.clearChoices();
 
         ui.showImage(
@@ -569,6 +599,7 @@ public class GameController {
     // ==================================================
 
     private void chapter3() {
+        setChapterHeader(3, Lang.t("ch3.title"));
         ui.clearChoices();
 
         ui.showImage("/com/example/demo/fityesz_art/bg/ch3_hall.png");
@@ -905,6 +936,7 @@ public class GameController {
 // ==================================================
 
     private void chapter4() {
+        setChapterHeader(4, Lang.t("ch4.title"));
         ui.clearChoices();
         ui.showImage("/com/example/demo/fityesz_art/bg/ch4_office.png");
         ui.hideCharacter();
@@ -1045,6 +1077,7 @@ public class GameController {
     }
 
     private void chapter5() {
+        setChapterHeader(5, Lang.t("ch5.title"));
 
         ui.clearChoices();
 
@@ -1411,6 +1444,7 @@ public class GameController {
     }
 
     private void chapter6() {
+        setChapterHeader(6, Lang.t("ch6.title"));
 
         ui.hideBossFight();
         ui.clearChoices();
@@ -1563,6 +1597,7 @@ public class GameController {
     }
 
     private void chapter7() {
+        setChapterHeader(7, Lang.t("ch7.title"));
 
         ui.hideBossFight();
         ui.clearChoices();
