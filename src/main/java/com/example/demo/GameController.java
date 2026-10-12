@@ -255,13 +255,14 @@ public class GameController {
         ui.clearChoices();
 
         ui.showCharacter(
-                "/com/example/demo/fityesz_art/characters/lipoti.png"
-        );
-
-        ui.showCharacter(
                 "/com/example/demo/fityesz_art/characters/lipoti.png",
                 Lang.t("npc.lipoti"),
                 Lang.t("npc.lipoti.role")
+        );
+
+        ui.showDialogue(
+                Lang.t("npc.lipoti"),
+                Lang.t("ch1.lipoti1", state.getName())
         );
 
         ui.addChoice(
@@ -284,6 +285,15 @@ public class GameController {
                 Lang.t("npc.lipoti"),
                 Lang.t("ch1.lipoti2")
         );
+
+        // one more click, as though another line followed - the choices arrive instead
+        ui.addChoice(1, Lang.t("ui.enter"), this::chapter1Question);
+    }
+
+    private void chapter1Question() {
+        ui.clearChoices();
+
+        ui.setChoicePrompt(Lang.t("ch1.q1"));
 
         ui.addChoice(
                 1,
@@ -359,10 +369,9 @@ public class GameController {
     private void showEnvelope() {
         ui.clearChoices();
 
-        ui.showDialogue(
-                Lang.t("npc.lipoti"),
-                Lang.t("ch1.envelope")
-        );
+        ui.hideCharacter();
+
+        ui.showDialogue("", Lang.t("ch1.envelope"));
 
         ui.addChoice(1, Lang.t("ui.enter"), this::envelopeOffer);
     }
@@ -370,10 +379,24 @@ public class GameController {
     private void envelopeOffer() {
         ui.clearChoices();
 
+        ui.showCharacter(
+                "/com/example/demo/fityesz_art/characters/lipoti2.png",
+                Lang.t("npc.lipoti"),
+                Lang.t("npc.lipoti.role")
+        );
+
         ui.showDialogue(
                 Lang.t("npc.lipoti"),
                 Lang.t("ch1.lipoti4")
         );
+
+        ui.addChoice(1, Lang.t("ui.enter"), this::envelopeQuestion);
+    }
+
+    private void envelopeQuestion() {
+        ui.clearChoices();
+
+        ui.setChoicePrompt(Lang.t("ch1.q2"));
 
         ui.addChoice(
                 1,
@@ -405,10 +428,8 @@ public class GameController {
             exposureDelta = 15;
             state.setFirstEnvelope(true);
 
-            ui.showDialogue(
-                    Lang.t("npc.lipoti"),
-                    Lang.t("ch1.q2.ans1")
-            );
+            ui.hideCharacter();
+            ui.showDialogue("", Lang.t("ch1.q2.ans1"));
         } else if (choice == 2) {
             xpDelta = 10;
             exposureDelta = 5;
