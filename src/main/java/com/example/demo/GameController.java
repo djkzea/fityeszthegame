@@ -1107,6 +1107,21 @@ public class GameController {
         );
         ui.hideCharacter();
 
+        // Chapters 1-4 open on a title card. This one started mid-scene, which is
+        // why chapter five never announced where it was happening.
+        ui.showDialogue(
+                Lang.t("ui.chapter"),
+                Lang.t("ch5.title") + "\n\n"
+                        + Lang.t("ch5.quote") + "\n\n"
+                        + Lang.t("ch5.place")
+        );
+
+        ui.addChoice(1, Lang.t("ui.enter"), this::chapter5Intro);
+    }
+
+    private void chapter5Intro() {
+        ui.clearChoices();
+
         ui.showDialogue(
                 Lang.t("npc.unknown"),
                 Lang.t("ch5.t1")
@@ -1478,7 +1493,8 @@ public class GameController {
         ui.showDialogue(
                 Lang.t("ui.chapter"),
                 Lang.t("ch6.title") + "\n\n"
-                        + Lang.t("ch6.quote")
+                        + Lang.t("ch6.quote") + "\n\n"
+                        + Lang.t("ch6.place")
         );
 
         ui.addChoice(
@@ -1631,7 +1647,8 @@ public class GameController {
         ui.showDialogue(
                 Lang.t("ui.chapter"),
                 Lang.t("ch7.title") + "\n\n"
-                        + Lang.t("ch7.quote")
+                        + Lang.t("ch7.quote") + "\n\n"
+                        + Lang.t("ch7.place")
         );
 
         ui.addChoice(

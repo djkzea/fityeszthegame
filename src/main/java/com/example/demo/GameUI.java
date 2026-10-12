@@ -159,6 +159,10 @@ public class GameUI {
     private final HBox locationStrip;
     private final Label locationLabel;
     private final VBox characterTag;
+
+    /** what the script asked for, as opposed to what is on screen right now */
+    private boolean characterWanted = false;
+    private boolean tagWanted = false;
     private final Label characterNameLabel;
     private final Label characterRoleLabel;
 
@@ -730,16 +734,19 @@ public class GameUI {
         summaryItemsValue = statValue("0");
 
         summaryXpName = statName(Lang.t("ui.xp"));
+        summaryXpName.setTextFill(Color.web(GRAY));
         VBox summaryXpCol = new VBox(4, summaryXpName, summaryXpValue);
         summaryXpCol.setAlignment(Pos.CENTER);
         HBox.setHgrow(summaryXpCol, Priority.ALWAYS);
 
         summaryExposureName = statName(Lang.t("ui.exposure"));
+        summaryExposureName.setTextFill(Color.web(GRAY));
         VBox summaryExposureCol = new VBox(4, summaryExposureName, summaryExposureValue);
         summaryExposureCol.setAlignment(Pos.CENTER);
         HBox.setHgrow(summaryExposureCol, Priority.ALWAYS);
 
         summaryItemsName = statName(Lang.t("ui.items"));
+        summaryItemsName.setTextFill(Color.web(GRAY));
         VBox summaryItemsCol = new VBox(4, summaryItemsName, summaryItemsValue);
         summaryItemsCol.setAlignment(Pos.CENTER);
         HBox.setHgrow(summaryItemsCol, Priority.ALWAYS);
@@ -787,7 +794,7 @@ public class GameUI {
         summaryContent.setStyle(
                 "-fx-background-color: " + PAPER + ";" +
                         "-fx-border-color: " + INK + ";" +
-                        "-fx-border-width: 1.5;"
+                        "-fx-border-width: 3;"
         );
 
         summaryCard = new StackPane(summaryContent);
@@ -1046,6 +1053,10 @@ public class GameUI {
 
         speakerTab.setText(sp.toUpperCase());
         setShown(speakerTab, !narration);
+
+        if (!narration) {
+            alternatePose();
+        }
 
         Font f = narration ? bodyItalic(18) : body(18);
         shownText.setFont(f);
@@ -1335,10 +1346,6 @@ public class GameUI {
 
         boolean card = titleCard.isVisible() || summaryCard.isVisible();
 
-        setShown(dialogueWrap, dialogueShown && !card);
-
-        setShown(hintLabel, enterMode && !card);
-
         boolean hasChoices = false;
         int count = 0;
         for (Node n : choicesBox.getChildren()) {
@@ -1349,6 +1356,13 @@ public class GameUI {
         }
 
         boolean panel = !card && !enterMode && hasChoices && !typingActive;
+
+        // While a question is up the scene gets out of the way, as the web build
+        // does: no portrait, no name card, no dialogue box behind the choices.
+        setShown(dialogueWrap, dialogueShown && !card && !panel);
+        setShown(hintLabel, enterMode && !card);
+        setShown(characterView, characterWanted && !card && !panel);
+        setShown(characterTag, tagWanted && !card && !panel);
 
         // Compact layout during boss fights so everything fits on screen
         boolean compact = bossArea.isVisible();
@@ -1979,6 +1993,7 @@ public class GameUI {
         boolean changed = !path.equals(currentCharacter);
 
         characterView.setImage(image);
+        characterWanted = true;
         setShown(characterView, true);
         currentCharacter = path;
 
@@ -2015,6 +2030,8 @@ public class GameUI {
 
         showCharacter(path);
 
+        tagWanted = true;
+
         characterNameLabel.setText(name.toUpperCase());
         characterRoleLabel.setText(role.toUpperCase());
 
@@ -2032,8 +2049,61 @@ public class GameUI {
     public void hideCharacter() {
         characterView.setImage(null);
         currentCharacter = null;
+        characterWanted = false;
+        tagWanted = false;
         setShown(characterView, false);
         setShown(characterTag, false);
+        refreshLayout();
+    }
+
+    /** Swaps the portrait to the character's other pose, if they have one. */
+    private void alternatePose() {
+
+        if (!characterWanted || currentCharacter == null) {
+            return;
+        }
+
+        String other = otherPose(currentCharacter);
+
+        if (other.equals(currentCharacter)) {
+            return;
+        }
+
+        Image image = loadImage(other);
+
+        if (image == null) {
+            return;
+        }
+
+        currentCharacter = other;
+        characterView.setImage(image);
+
+        FadeTransition fade = new FadeTransition(Duration.millis(180), characterView);
+        fade.setFromValue(0.55);
+        fade.setToValue(1);
+        fade.play();
+    }
+
+    /**
+     * The other pose of the same character, e.g. lipoti.png <-> lipoti2.png.
+     * Returns the path unchanged when there is no sibling to swap to.
+     */
+    private static String otherPose(String path) {
+
+        if (path == null) {
+            return null;
+        }
+
+        int dot = path.lastIndexOf('.');
+        if (dot < 0) {
+            return path;
+        }
+
+        String stem = path.substring(0, dot);
+        String ext = path.substring(dot);
+        String swapped = stem.endsWith("2") ? stem.substring(0, stem.length() - 1) + ext : stem + "2" + ext;
+
+        return GameUI.class.getResource(swapped) != null ? swapped : path;
     }
 
 
