@@ -494,7 +494,9 @@ public class GameUI {
         speakerTab.setFont(head(24));
         speakerTab.setTextFill(Color.web("#FFF8EC"));
         speakerTab.setPadding(new Insets(6, 16, 3, 16));
-        speakerTab.setStyle("-fx-background-color: " + RED + ";");
+        speakerTab.setStyle("-fx-background-color: " + RED + ";"
+                + "-fx-border-color: " + PAPER + ";"
+                + "-fx-border-width: 2;");
         speakerTab.setMaxWidth(Region.USE_PREF_SIZE);
 
         shownText.setFont(body(18));
@@ -684,11 +686,8 @@ public class GameUI {
         titleContent.setAlignment(Pos.CENTER);
         VBox.setMargin(titleHint, new Insets(18, 0, 0, 0));
 
-        Region titleDots = new Region();
-        titleDots.setBackground(dotBackground(0.12));
-        titleDots.setMouseTransparent(true);
 
-        titleCard = new StackPane(titleDots, titleContent);
+        titleCard = new StackPane(titleContent);
         titleCard.setStyle("-fx-background-color: " + RED + ";");
         titleCard.setCursor(javafx.scene.Cursor.HAND);
         titleCard.setOnMouseClicked(e -> advance());
@@ -1198,8 +1197,10 @@ public class GameUI {
         titleQuote.setText(quote);
         titleHint.setText(Lang.t("ui.enter"));
 
+        // The header belongs to whoever called setChapter - this used to overwrite it
+        // with a numberless "FEJEZET · ...", which is why the chapter number never
+        // showed even once the script started setting it.
         chapterName = title.toUpperCase();
-        chapterTitle.setText(Lang.t("ui.chapter").toUpperCase() + " · " + chapterName);
 
         setLocation(place);
         setProgress(0);
