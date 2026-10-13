@@ -1054,7 +1054,9 @@ public class GameUI {
         speakerTab.setText(sp.toUpperCase());
         setShown(speakerTab, !narration);
 
-        if (!narration) {
+        // In a fight the script chooses the pose itself each round, to show what the
+        // opponent just did - alternating on top of that would undo the choice.
+        if (!narration && !bossArea.isVisible()) {
             alternatePose();
         }
 
@@ -1357,15 +1359,21 @@ public class GameUI {
 
         boolean panel = !card && !enterMode && hasChoices && !typingActive;
 
-        // While a question is up the scene gets out of the way, as the web build
-        // does: no portrait, no name card, no dialogue box behind the choices.
-        setShown(dialogueWrap, dialogueShown && !card && !panel);
-        setShown(hintLabel, enterMode && !card);
-        setShown(characterView, characterWanted && !card && !panel);
-        setShown(characterTag, tagWanted && !card && !panel);
-
         // Compact layout during boss fights so everything fits on screen
         boolean compact = bossArea.isVisible();
+
+        // While a question is up the scene gets out of the way, as the web build
+        // does: no portrait, no name card, no dialogue box behind the choices.
+        //
+        // Except in a fight. There the round is choose -> result -> choose, so
+        // stepping aside every time made the portrait flash in and out on each
+        // decision. In a fight the opponent stays put.
+        boolean stepAside = panel && !compact;
+
+        setShown(dialogueWrap, dialogueShown && !card && !stepAside);
+        setShown(hintLabel, enterMode && !card);
+        setShown(characterView, characterWanted && !card && !stepAside);
+        setShown(characterTag, tagWanted && !card && !stepAside);
 
         dialogueBox.setMinHeight(compact ? 92 : 127);
         setShown(choiceHeader, !compact || !choicePromptLabel.getText().isEmpty());
