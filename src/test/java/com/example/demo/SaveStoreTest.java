@@ -88,4 +88,104 @@ class SaveStoreTest {
         assertEquals(good, SaveStore.newer(broken, good));
         assertEquals(good, SaveStore.newer(good, broken));
     }
+
+    /** A transport that records what was asked and answers from a list. */
+    private static final class FakeTransport implements Transport {
+
+        record Call(String method, String url, java.util.Map<String, String> headers, String body) { }
+
+        final List<Call> calls = new java.util.ArrayList<>();
+        final List<Res> answers = new java.util.ArrayList<>();
+
+        @Override
+        public Res send(String method, String url, java.util.Map<String, String> headers, String body) {
+            calls.add(new Call(method, url, headers, body));
+            return answers.isEmpty() ? new Res(500, "") : answers.remove(0);
+        }
+    }
+
+    @Test
+    void theUpsertCarriesTheRowsOwnColumns(@TempDir Path dir) {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(201, ""));
+
+        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
+                new Supabase("https://p.supabase.co", "anon-key", t));
+
+        store.pushCloud(run(3, "lakatosRules", "2026-10-17T18:00:00Z"), "u-1", "acc1");
+
+        FakeTransport.Call call = t.calls.get(0);
+        assertEquals("POST", call.method());
+        assertEquals("https://p.supabase.co/rest/v1/saves?on_conflict=user_id,slot", call.url());
+        assertEquals("Bearer acc1", call.headers().get("Authorization"));
+        assertEquals("resolution=merge-duplicates,return=minimal", call.headers().get("Prefer"));
+        assertTrue(call.body().startsWith("["), "a PostgREST upsert egy tombot kap");
+        assertTrue(call.body().contains("\"user_id\":\"u-1\""), "user_id nelkul az RLS elutasitja");
+        assertTrue(call.body().contains("\"slot\":1"));
+        assertTrue(call.body().contains("\"scene\":\"lakatosRules\""));
+    }
+
+    @Test
+    void theCloudRunComesBackFromTheFirstRow(@TempDir Path dir) {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200,
+                "[{\"player_name\":\"Zsombi\",\"chapter\":4,\"xp\":80,\"lebukas\":20,\"szint\":2,"
+                        + "\"items\":[\"envelope1\"],\"history\":[],\"log\":[],"
+                        + "\"updated_at\":\"2026-10-17T19:00:00Z\"}]"));
+
+        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
+                new Supabase("https://p.supabase.co", "anon-key", t));
+
+        SaveData d = store.fetchCloud("acc1").orElseThrow();
+
+        assertEquals(4, d.chapter());
+        assertEquals("Zsombi", d.playerName());
+        assertTrue(t.calls.get(0).url().contains("slot=eq.1"));
+        assertEquals("GET", t.calls.get(0).method());
+    }
+
+    @Test
+    void anEmptyCloudAnswerIsNoSave(@TempDir Path dir) {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200, "[]"));
+
+        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
+                new Supabase("https://p.supabase.co", "anon-key", t));
+
+        assertTrue(store.fetchCloud("acc1").isEmpty());
+    }
+
+    @Test
+    void aFailingCloudDoesNotTakeTheGameDown(@TempDir Path dir) {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(503, "down"));
+
+        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
+                new Supabase("https://p.supabase.co", "anon-key", t));
+
+        assertTrue(store.fetchCloud("acc1").isEmpty());
+        store.pushCloud(run(1, "chapter1", "2026-10-17T18:00:00Z"), "u-1", "acc1");
+    }
+
+    @Test
+    void withoutAProjectNothingIsPushed(@TempDir Path dir) {
+        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"), null);
+        store.pushCloud(run(1, "chapter1", "2026-10-17T18:00:00Z"), "u-1", "acc1");
+        assertTrue(store.fetchCloud("acc1").isEmpty());
+    }
+
+    @Test
+    void aRunWithNoDecisionsNeverOverwritesTheAccount(@TempDir Path dir) {
+        FakeTransport t = new FakeTransport();
+
+        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
+                new Supabase("https://p.supabase.co", "anon-key", t));
+
+        SaveData blank = new SaveData("Zsombi", "Zsombi", 1, "chapter1", 0, 0, 1,
+                List.of(), List.of(), List.of(), null, "2026-10-17T18:00:00Z");
+
+        store.pushCloud(blank, "u-1", "acc1");
+
+        assertEquals(List.of(), t.calls);
+    }
 }

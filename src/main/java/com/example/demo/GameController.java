@@ -61,7 +61,22 @@ public class GameController {
 
     private final Chatlog chatlog = new Chatlog();
 
-    private final SaveStore saves = new SaveStore(AppDirs.data().resolve("save-slot1.json"));
+    /** Null when this build has no Supabase project configured - guest only. */
+    private final Account account = Supabase.configured()
+            .map(sb -> new Account(sb, AppDirs.data().resolve("session.json")))
+            .orElse(null);
+
+    private final SaveStore saves = new SaveStore(
+            AppDirs.data().resolve("save-slot1.json"),
+            Supabase.configured().orElse(null));
+
+    /** One thread for the account writes, so a slow server never holds up a click. */
+    private final java.util.concurrent.ExecutorService network =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "fityesz-save");
+                t.setDaemon(true);
+                return t;
+            });
 
     private final java.util.List<SaveData.Decision> history = new java.util.ArrayList<>();
 
@@ -79,6 +94,11 @@ public class GameController {
         this.ui = new GameUI();
 
         ui.setOnGameRestart(this::restartGame);
+
+        // the session from last time, so the title screen already knows the name
+        if (account != null) {
+            account.restore();
+        }
     }
 
     /**
@@ -117,6 +137,8 @@ public class GameController {
                     chapterDecisions,
                     nextUp
             );
+
+            saveNow(true);
 
             chapterDecisions.clear();
 
@@ -257,7 +279,26 @@ public class GameController {
 
     /** The pause menu's SAVE, and every chapter boundary. */
     public void saveNow(boolean toCloud) {
-        saves.saveLocal(snapshot());
+
+        SaveData data = snapshot();
+
+        saves.saveLocal(data);
+
+        if (!toCloud || account == null) {
+            return;
+        }
+
+        account.session().ifPresent(session ->
+                network.submit(() -> saves.pushCloud(data, session.userId(), session.accessToken())));
+    }
+
+    /** The signed-in player, if there is one. */
+    public Account account() {
+        return account;
+    }
+
+    public SaveStore saves() {
+        return saves;
     }
 
     /** The log the napló overlay reads. */
