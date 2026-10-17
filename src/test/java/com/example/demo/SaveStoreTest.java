@@ -18,7 +18,7 @@ class SaveStoreTest {
     private static SaveData run(int chapter, String scene, String updatedAt) {
         return new SaveData("Zsombi", "Zsombi", chapter, scene, 10, 5, 1,
                 List.of("envelope1"), List.of(new SaveData.Decision("ch1.q1", 0)),
-                List.of(), null, updatedAt);
+                List.of(), null, null, updatedAt);
     }
 
     @Test
@@ -182,7 +182,7 @@ class SaveStoreTest {
                 new Supabase("https://p.supabase.co", "anon-key", t));
 
         SaveData blank = new SaveData("Zsombi", "Zsombi", 1, "chapter1", 0, 0, 1,
-                List.of(), List.of(), List.of(), null, "2026-10-17T18:00:00Z");
+                List.of(), List.of(), List.of(), null, null, "2026-10-17T18:00:00Z");
 
         store.pushCloud(blank, "u-1", "acc1");
 

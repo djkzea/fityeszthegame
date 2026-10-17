@@ -202,6 +202,7 @@ public class GameController {
                 new SaveData.Fight(
                         state.getPlayerHp(), state.getBossHp(),
                         previousMove, sameMove, peteriPassiveRounds),
+                ui.scenery(),
                 java.time.Instant.now().toString());
     }
 
@@ -248,6 +249,9 @@ public class GameController {
         ui.resetForNewGame();
         ui.updateStats(state);
         ui.hideRestartButton();
+
+        // the background, the location and the chapter line, before the scene runs
+        ui.showScenery(data.scenery());
 
         String scene = data.scene() == null || data.scene().isBlank()
                 ? CHAPTER_ENTRY.getOrDefault(data.chapter(), "showStartScreen")

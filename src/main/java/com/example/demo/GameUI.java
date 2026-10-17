@@ -2489,6 +2489,54 @@ public class GameUI {
         updateGhost();
     }
 
+    // =========================================================
+    // SCENERY (what the save needs to reopen on the same stage)
+    // =========================================================
+
+    /** What is on the stage right now. */
+    public SaveData.Scenery scenery() {
+
+        boolean tag = characterTag.isVisible();
+
+        return new SaveData.Scenery(
+                currentBg,
+                currentCharacter,
+                tag ? characterNameLabel.getText() : null,
+                tag ? characterRoleLabel.getText() : null,
+                locationStrip.isVisible() ? locationLabel.getText() : null,
+                chapterTitle.getText());
+    }
+
+    /**
+     * Puts a saved stage back. Runs before the restored scene itself, so
+     * anything that scene sets of its own still wins.
+     */
+    public void showScenery(SaveData.Scenery saved) {
+
+        if (saved == null) {
+            return;
+        }
+
+        if (saved.chapter() != null && !saved.chapter().isBlank()) {
+            setChapter(saved.chapter());
+        }
+
+        setLocation(saved.location());
+
+        if (saved.background() != null) {
+            showImage(saved.background());
+        }
+
+        if (saved.character() != null) {
+            if (saved.characterName() != null) {
+                showCharacter(saved.character(), saved.characterName(),
+                        saved.characterRole() == null ? "" : saved.characterRole());
+            } else {
+                showCharacter(saved.character());
+            }
+        }
+    }
+
     public BorderPane getRoot() {
         return root;
     }

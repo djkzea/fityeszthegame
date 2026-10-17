@@ -65,7 +65,13 @@ class ResumeSmokeTest {
                 30, 10, 1, List.of("envelope1"),
                 List.of(new SaveData.Decision("ch1.q1", 1)),
                 List.of(new Chatlog.Entry("line", "LIPÓTI", "Régi sor.", null, null, 1)),
-                null, "2026-10-17T18:00:00Z");
+                null,
+                new SaveData.Scenery(
+                        "/com/example/demo/fityesz_art/bg/ch1_cafe.png",
+                        "/com/example/demo/fityesz_art/characters/lipoti.png",
+                        "LIPÓTI", "A KÖZVETÍTŐ", "EGY ELDUGOTT KÁVÉZÓ",
+                        "1. FEJEZET · A TOBORZÁS"),
+                "2026-10-17T18:00:00Z");
 
         GameController controller = onFxThread(() -> {
             GameController c = new GameController(new Stage());
@@ -83,6 +89,13 @@ class ResumeSmokeTest {
         assertEquals(List.of("envelope1"), first.items());
         assertEquals(List.of(new SaveData.Decision("ch1.q1", 1)), first.history());
         assertEquals("Régi sor.", first.log().get(0).text());
+
+        // The background is what a mid-chapter scene no longer sets for itself:
+        // without it a restored run opened on a bare stage with only the ghost
+        // title on it, which is what the player reported.
+        assertEquals("/com/example/demo/fityesz_art/bg/ch1_cafe.png", first.scenery().background());
+        assertEquals("EGY ELDUGOTT KÁVÉZÓ", first.scenery().location());
+        assertEquals("1. FEJEZET · A TOBORZÁS", first.scenery().chapter());
 
         // Two presses forward: the first finishes the typewriter, the second is
         // the click that moves the scene on - the same as playing it.

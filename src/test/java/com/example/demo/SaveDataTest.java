@@ -18,6 +18,8 @@ class SaveDataTest {
                 List.of(new SaveData.Decision("ch1.q1", 0), new SaveData.Decision("ch2.q", 2)),
                 List.of(new Chatlog.Entry("line", "LIPÓTI", "Jó napot.", null, null, 1)),
                 new SaveData.Fight(90, 55, 2, 1, 0),
+                new SaveData.Scenery("/bg/ch1_cafe.png", "/ch/lipoti.png", "LIPÓTI", "A KÖZVETÍTŐ",
+                        "EGY ELDUGOTT KÁVÉZÓ", "1. FEJEZET · A TOBORZÁS"),
                 "2026-10-17T18:20:00Z");
     }
 
@@ -33,6 +35,7 @@ class SaveDataTest {
         assertEquals("2026-10-17T18:20:00Z", n.get("updated_at").asText());
         assertEquals("ch1.q1", n.get("history").get(0).get("choicePointId").asText());
         assertEquals(90, n.get("fight").get("playerHp").asInt());
+        assertEquals("/bg/ch1_cafe.png", n.get("scenery").get("background").asText());
     }
 
     @Test

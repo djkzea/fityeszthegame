@@ -26,6 +26,7 @@ public record SaveData(
         @JsonProperty("history") List<Decision> history,
         @JsonProperty("log") List<Chatlog.Entry> log,
         @JsonProperty("fight") Fight fight,
+        @JsonProperty("scenery") Scenery scenery,
         @JsonProperty("updated_at") String updatedAt) {
 
     /** A choice the player made, keyed the way the website keys it. */
@@ -33,6 +34,23 @@ public record SaveData(
     public record Decision(
             @JsonProperty("choicePointId") String choicePointId,
             @JsonProperty("optionIndex") int optionIndex) { }
+
+    /**
+     * What is on the stage.
+     *
+     * A scene in the middle of a chapter does not set the background, the
+     * location or the chapter line - the chapter's opening scene did that, and
+     * it is not replayed. Without this, a restored run opened on a bare dark
+     * stage with nothing but the ghost title on it.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Scenery(
+            @JsonProperty("background") String background,
+            @JsonProperty("character") String character,
+            @JsonProperty("characterName") String characterName,
+            @JsonProperty("characterRole") String characterRole,
+            @JsonProperty("location") String location,
+            @JsonProperty("chapter") String chapter) { }
 
     /** What a boss fight is holding that the stats do not: the move counters. */
     @JsonIgnoreProperties(ignoreUnknown = true)

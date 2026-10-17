@@ -102,7 +102,7 @@ public class SaveStore {
     }
 
     private static final String COLUMNS =
-            "player_name,display_name,chapter,scene,xp,lebukas,szint,items,history,log,fight,updated_at";
+            "player_name,display_name,chapter,scene,xp,lebukas,szint,items,history,log,fight,scenery,updated_at";
 
     /**
      * Writes the run into the account.
