@@ -70,10 +70,42 @@ public final class Account {
         }
     }
 
+    /**
+     * Signs in with an address or a username, in that order of directness.
+     *
+     * An address is what Supabase authenticates on, so it goes straight to the
+     * token endpoint - the same shortcut the website takes. A username has to be
+     * resolved to an address first, and that only happens inside the sign-in
+     * Edge Function, which holds the service role key; doing the lookup in a
+     * client would make every username enumerable.
+     *
+     * If that function has not been deployed, a username cannot be signed in at
+     * all, and saying so is more use than one more "wrong details".
+     */
     public Session signIn(String identifier, String password) throws AuthException {
 
+        String id = identifier.trim();
+
+        if (id.contains("@")) {
+
+            Transport.Res direct = call("POST", "/auth/v1/token?grant_type=password",
+                    write(new PasswordBody(id, password)), null);
+
+            if (direct.ok()) {
+                JsonNode tokens = read(direct.body());
+                return finish(tokens.path("access_token").asText(),
+                        tokens.path("refresh_token").asText());
+            }
+
+            throw new AuthException("ui.authFailed");
+        }
+
         Transport.Res res = call("POST", "/functions/v1/sign-in",
-                write(new SignInBody(identifier.trim(), password)), null);
+                write(new SignInBody(id, password)), null);
+
+        if (res.status() == 404) {
+            throw new AuthException("ui.authNoUsernames");
+        }
 
         if (!res.ok()) {
             throw new AuthException("ui.authFailed");
@@ -206,6 +238,8 @@ public final class Account {
     }
 
     private record SignInBody(String identifier, String password) { }
+
+    private record PasswordBody(String email, String password) { }
 
     private record SignUpBody(String email, String password, Meta data) { }
 

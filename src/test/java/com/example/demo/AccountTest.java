@@ -66,6 +66,35 @@ class AccountTest {
     }
 
     @Test
+    void anAddressSignsInWithoutTheEdgeFunction(@TempDir Path dir) throws Exception {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200, TOKENS));
+        t.answers.add(new Transport.Res(200, USER));
+
+        Account account = new Account(
+                new Supabase("https://p.supabase.co", "anon-key", t), dir.resolve("session.json"));
+
+        assertEquals("acc1", account.signIn("zsombi@pelda.hu", "titkos123").accessToken());
+
+        assertEquals("https://p.supabase.co/auth/v1/token?grant_type=password", t.calls.get(0).url());
+        assertTrue(t.calls.get(0).body().contains("\"email\":\"zsombi@pelda.hu\""));
+    }
+
+    @Test
+    void aMissingEdgeFunctionSaysSoInsteadOfBlamingThePassword(@TempDir Path dir) {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(404, "{\"code\":\"NOT_FOUND\"}"));
+
+        Account account = new Account(
+                new Supabase("https://p.supabase.co", "anon-key", t), dir.resolve("session.json"));
+
+        Account.AuthException e = assertThrows(Account.AuthException.class,
+                () -> account.signIn("zsombi", "titkos123"));
+
+        assertEquals("ui.authNoUsernames", e.messageKey());
+    }
+
+    @Test
     void theSessionOutlivesTheProcess(@TempDir Path dir) throws Exception {
         FakeTransport t = new FakeTransport();
         t.answers.add(new Transport.Res(200, TOKENS));

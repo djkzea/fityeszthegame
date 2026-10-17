@@ -158,6 +158,29 @@ class SaveStoreTest {
     }
 
     @Test
+    void aProjectWithoutTheMigrationStillGetsTheRun(@TempDir Path dir) {
+
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(400,
+                "{\"code\":\"42703\",\"message\":\"column saves.scene does not exist\"}"));
+        t.answers.add(new Transport.Res(201, ""));
+
+        SaveStore store = new SaveStore(dir,
+                new Supabase("https://p.supabase.co", "anon-key", t));
+
+        store.pushCloud(1, run(3, "lakatosRules", "2026-10-17T18:00:00Z"), "u-1", "acc1");
+
+        assertEquals(2, t.calls.size(), "a masodik probalkozas elmaradt");
+
+        String retry = t.calls.get(1).body();
+        assertFalse(retry.contains("\"scene\""), retry);
+        assertFalse(retry.contains("\"scenery\""), retry);
+        assertFalse(retry.contains("\"log\""), retry);
+        assertTrue(retry.contains("\"chapter\":3"), retry);
+        assertTrue(retry.contains("\"user_id\":\"u-1\""), retry);
+    }
+
+    @Test
     void anEmptyCloudAnswerIsNoSave(@TempDir Path dir) {
         FakeTransport t = new FakeTransport();
         t.answers.add(new Transport.Res(200, "[]"));

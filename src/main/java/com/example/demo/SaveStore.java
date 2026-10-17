@@ -112,6 +112,10 @@ public class SaveStore {
         }
     }
 
+    /** What the saves table held before migration 0003. */
+    private static final String WEBSITE_COLUMNS =
+            "player_name,display_name,chapter,xp,lebukas,szint,items,history,updated_at";
+
     private static final String COLUMNS =
             "player_name,display_name,chapter,scene,xp,lebukas,szint,items,history,log,fight,scenery,updated_at";
 
@@ -134,9 +138,15 @@ public class SaveStore {
         }
 
         try {
-            Transport.Res res = sb.call("POST", "/rest/v1/saves?on_conflict=user_id,slot",
-                    rowOf(data, userId, slot), token,
-                    java.util.Map.of("Prefer", "resolution=merge-duplicates,return=minimal"));
+            Transport.Res res = upsert(rowOf(data, userId, slot, false), token);
+
+            // 42703 is Postgres for "no such column": the project has not had the
+            // desktop migration run on it yet. The stage, the log and the fight
+            // are what it does not know about, and a run without them is still
+            // worth keeping - the website's own columns go up on their own.
+            if (!res.ok() && res.body() != null && res.body().contains("42703")) {
+                res = upsert(rowOf(data, userId, slot, true), token);
+            }
 
             if (!res.ok()) {
                 System.err.println("save: felho " + res.status() + " " + res.body());
@@ -145,6 +155,11 @@ public class SaveStore {
         } catch (IOException e) {
             System.err.println("save: " + e.getMessage());
         }
+    }
+
+    private Transport.Res upsert(String body, String token) throws IOException {
+        return sb.call("POST", "/rest/v1/saves?on_conflict=user_id,slot", body, token,
+                java.util.Map.of("Prefer", "resolution=merge-duplicates,return=minimal"));
     }
 
     /**
@@ -163,6 +178,10 @@ public class SaveStore {
 
         try {
             Transport.Res res = sb.call("GET", "/rest/v1/saves?select=slot," + COLUMNS, null, token);
+
+            if (!res.ok() && res.body() != null && res.body().contains("42703")) {
+                res = sb.call("GET", "/rest/v1/saves?select=slot," + WEBSITE_COLUMNS, null, token);
+            }
 
             if (!res.ok()) {
                 System.err.println("save: felho " + res.status());
@@ -206,13 +225,21 @@ public class SaveStore {
         return all;
     }
 
-    /** The upsert's body: the run plus the two columns that belong to the row. */
-    String rowOf(SaveData data, String userId, int slot) throws IOException {
+    /**
+     * The upsert's body: the run plus the two columns that belong to the row.
+     * "websiteOnly" leaves out what migration 0003 added, for a project that has
+     * not had it run yet.
+     */
+    String rowOf(SaveData data, String userId, int slot, boolean websiteOnly) throws IOException {
 
         com.fasterxml.jackson.databind.node.ObjectNode row = Json.mapper().valueToTree(data);
 
         row.put("user_id", userId);
         row.put("slot", slot);
+
+        if (websiteOnly) {
+            row.remove(java.util.List.of("scene", "log", "fight", "scenery"));
+        }
 
         return Json.mapper().writeValueAsString(Json.mapper().createArrayNode().add(row));
     }
