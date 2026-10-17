@@ -167,7 +167,7 @@ public class GameController {
 
         ui.clearChoices();
 
-        StackWalker.getInstance()
+        StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
                 .walk(frames -> frames.skip(1).findFirst())
                 .filter(f -> f.getMethodType().parameterCount() == 0)
                 .ifPresent(f -> currentScene = f.getMethodName());
