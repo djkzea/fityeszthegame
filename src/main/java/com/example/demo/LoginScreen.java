@@ -17,6 +17,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.Group;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -160,9 +161,12 @@ public final class LoginScreen {
         java.net.URL art = LoginScreen.class.getResource(ART + "login_office.jpg");
 
         if (art != null) {
+            // Anchored to the bottom left, not the centre: the desk and the window
+            // live in that corner, and a wide window centring a 3:2 picture crops
+            // exactly them away.
             office.setStyle("-fx-background-image: url('" + art.toExternalForm() + "');"
                     + "-fx-background-size: cover;"
-                    + "-fx-background-position: center;"
+                    + "-fx-background-position: left bottom;"
                     + "-fx-background-repeat: no-repeat;");
         }
 
@@ -183,10 +187,28 @@ public final class LoginScreen {
         VBox column = new VBox(18, lockup, sheet);
         column.setAlignment(Pos.CENTER_LEFT);
         column.setMaxSize(430, Region.USE_PREF_SIZE);
-        StackPane.setAlignment(column, Pos.CENTER_RIGHT);
-        StackPane.setMargin(column, new Insets(0, 96, 0, 0));
 
-        root.getChildren().addAll(office, column, bar);
+        // Scaled as one block against the design height, the way the title page
+        // scales its own column - a 430px form adrift in a 2560px window is the
+        // same mistake as a poster that does not grow with the frame. The pivot
+        // is the right edge, so the form keeps its margin and grows inwards.
+        javafx.beans.binding.DoubleBinding scale = javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> Math.max(0.8, Math.min(1.7, root.getHeight() / 800.0)),
+                root.heightProperty());
+
+        javafx.scene.transform.Scale zoom = new javafx.scene.transform.Scale();
+        zoom.xProperty().bind(scale);
+        zoom.yProperty().bind(scale);
+        zoom.pivotXProperty().bind(column.widthProperty());
+        zoom.pivotYProperty().bind(column.heightProperty().divide(2));
+
+        Group scaled = new Group(column);
+        scaled.getTransforms().add(zoom);
+
+        StackPane.setAlignment(scaled, Pos.CENTER_RIGHT);
+        StackPane.setMargin(scaled, new Insets(0, 96, 0, 0));
+
+        root.getChildren().addAll(office, scaled, bar);
 
         showMode();
 
@@ -202,13 +224,13 @@ public final class LoginScreen {
         });
 
         // the sheet rises in, the way the summary card does
-        column.setOpacity(0);
-        column.setTranslateY(12);
+        scaled.setOpacity(0);
+        scaled.setTranslateY(12);
 
-        FadeTransition fade = new FadeTransition(javafx.util.Duration.millis(320), column);
+        FadeTransition fade = new FadeTransition(javafx.util.Duration.millis(320), scaled);
         fade.setToValue(1);
 
-        TranslateTransition rise = new TranslateTransition(javafx.util.Duration.millis(320), column);
+        TranslateTransition rise = new TranslateTransition(javafx.util.Duration.millis(320), scaled);
         rise.setToY(0);
 
         new ParallelTransition(fade, rise).play();
