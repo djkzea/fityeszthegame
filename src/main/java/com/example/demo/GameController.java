@@ -251,7 +251,7 @@ public class GameController {
         ui.hideRestartButton();
 
         // the background, the location and the chapter line, before the scene runs
-        ui.showScenery(data.scenery());
+        ui.showScenery(completed(data.scenery(), data.chapter()));
 
         String scene = data.scene() == null || data.scene().isBlank()
                 ? CHAPTER_ENTRY.getOrDefault(data.chapter(), "showStartScreen")
@@ -276,6 +276,37 @@ public class GameController {
         } finally {
             saving = true;
         }
+    }
+
+    /**
+     * The saved stage with its holes filled from the chapter it belongs to, so
+     * a run restored from a save that never had a background does not open on
+     * an empty stage - and does not save that emptiness on to the next load.
+     */
+    private SaveData.Scenery completed(SaveData.Scenery saved, int chapter) {
+
+        String background = saved == null ? null : saved.background();
+
+        if (background == null || background.isBlank()) {
+            background = GameUI.chapterBackground(chapter);
+        }
+
+        String header = saved == null ? null : saved.chapter();
+
+        // "FITYESZ KRÓNIKA" is the header before any chapter has opened - as good as missing
+        if (header == null || header.isBlank() || header.equalsIgnoreCase(Lang.t("ui.title"))) {
+            header = chapter == 0
+                    ? chapterHeader(0, Lang.t("pro.name"))
+                    : chapterHeader(chapter, Lang.t("ch" + chapter + ".title"));
+        }
+
+        return new SaveData.Scenery(
+                background,
+                saved == null ? null : saved.character(),
+                saved == null ? null : saved.characterName(),
+                saved == null ? null : saved.characterRole(),
+                saved == null ? null : saved.location(),
+                header);
     }
 
     private void runScene(String name) throws ReflectiveOperationException {
@@ -347,13 +378,19 @@ public class GameController {
 
         currentChapter = chapter;
 
+        ui.setChapter(chapterHeader(chapter, title));
+    }
+
+    /** "1. FEJEZET · A TOBORZÁS", "CHAPTER 1 · THE RECRUITMENT". */
+    private String chapterHeader(int chapter, String title) {
+
         String prefix = chapter == 0
                 ? Lang.t("ui.prologue")
                 : Lang.magyar()
                         ? chapter + ". " + Lang.t("ui.chapter")
                         : Lang.t("ui.chapter") + " " + chapter;
 
-        ui.setChapter(prefix + " · " + title);
+        return prefix + " · " + title;
     }
 
     private void showStartScreen() {

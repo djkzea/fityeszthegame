@@ -69,6 +69,8 @@ public class GameUI {
 
     // Palette and motion below are the site's own design tokens, read off
     // fityeszthegame.com so the desktop build and the web build match.
+    private static final String ART = "/com/example/demo/fityesz_art/";
+
     private static final String PAPER = "#FBF8F2";   // --sheet
     private static final String PAGE = "#F4EFE6";    // --paper
     private static final String INK = "#161616";     // --ink
@@ -205,7 +207,31 @@ public class GameUI {
     private final Button summaryContinueButton;
 
     // log overlay (the run's transcript)
+    /** Each chapter's opening background. The log's dividers and a restored run both ask for it. */
+    private static final java.util.Map<Integer, String> CHAPTER_BG = java.util.Map.of(
+            1, ART + "bg/ch1_cafe.png",
+            2, ART + "bg/ch2_hall.png",
+            3, ART + "bg/ch3_hall.png",
+            4, ART + "bg/ch4_office.png",
+            5, ART + "bg/ch5_corridor.png",
+            6, ART + "bg/ch6_lodge.png",
+            7, ART + "bg/ch7-1_office.png");
+
+    /** A chapter's opening background, or null for the prologue and anything unknown. */
+    public static String chapterBackground(int chapter) {
+        return CHAPTER_BG.get(chapter);
+    }
+
+    /** Who the log puts a face to. The key is the Lang key of the name they speak under. */
+    private static final java.util.Map<String, String> FACES = java.util.Map.of(
+            "npc.lipoti", ART + "characters/lipoti.png",
+            "npc.lakatos", ART + "characters/lakatoservin.png",
+            "npc.kapzs", ART + "characters/kapzsimre.png",
+            "npc.peteri", ART + "characters/drpeterikatalin.png",
+            "npc.molnar", ART + "characters/molnar.png");
+
     private final StackPane logCard;
+    private final ImageView logBackdrop = new ImageView();
     private final VBox logList = new VBox(0);
     private final ScrollPane logScroll;
     private final Label logCount = new Label("");
@@ -961,8 +987,22 @@ public class GameUI {
                 + "-fx-border-color: " + INK + ";"
                 + "-fx-border-width: 2;");
 
-        logCard = new StackPane(logSheet);
-        logCard.setStyle("-fx-background-color: rgba(22,22,22,0.88);");
+        // the scene the player is in, held behind the sheet out of focus - the log
+        // is read without leaving the room
+        logBackdrop.setPreserveRatio(false);
+        logBackdrop.setSmooth(true);
+        logBackdrop.setEffect(new javafx.scene.effect.GaussianBlur(26));
+        logBackdrop.setMouseTransparent(true);
+
+        Region logShade = new Region();
+        logShade.setStyle("-fx-background-color: rgba(18,18,18,0.74);");
+        logShade.setMouseTransparent(true);
+
+        logCard = new StackPane(logBackdrop, logShade, logSheet);
+        logCard.setStyle("-fx-background-color: rgba(22,22,22,0.55);");
+
+        logBackdrop.fitWidthProperty().bind(logCard.widthProperty());
+        logBackdrop.fitHeightProperty().bind(logCard.heightProperty());
         logCard.setVisible(false);
         logCard.setManaged(false);
         logCard.getStylesheets().add(slimScrollbar());
@@ -1504,6 +1544,8 @@ public class GameUI {
 
         logCount.setText(entries.size() + " " + Lang.t("ui.logEntries").toUpperCase());
 
+        logBackdrop.setImage(backgroundView.getImage());
+
         if (entries.isEmpty()) {
             Label empty = new Label(Lang.t("ui.logEmpty"));
             empty.setFont(bodyItalic(15));
@@ -1553,6 +1595,14 @@ public class GameUI {
         mark.setFont(label(10));
         mark.setTextFill(Color.web(RED));
 
+        Label title = new Label(chapter == 0
+                ? Lang.t("pro.name").toUpperCase()
+                : Lang.t("ch" + chapter + ".title").toUpperCase());
+        title.setFont(label(10));
+        title.setTextFill(Color.web(INK));
+
+        Node thumb = chapterThumb(chapter);
+
         Region line = new Region();
         line.setMinHeight(1);
         line.setPrefHeight(1);
@@ -1560,11 +1610,83 @@ public class GameUI {
         line.setStyle("-fx-background-color: " + TRACK + ";");
         HBox.setHgrow(line, Priority.ALWAYS);
 
-        HBox row = new HBox(12, mark, line);
+        HBox row = thumb == null
+                ? new HBox(10, mark, title, line)
+                : new HBox(10, thumb, mark, title, line);
+
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(22, 0, 10, 0));
 
         return row;
+    }
+
+    /** A strip of the chapter's own room, so the log reads as a place and not a list. */
+    private Node chapterThumb(int chapter) {
+
+        Image img = loadImage(CHAPTER_BG.get(chapter));
+
+        if (img == null) {
+            return null;
+        }
+
+        ImageView v = new ImageView(img);
+        v.setPreserveRatio(false);
+        v.setSmooth(true);
+        v.setFitWidth(76);
+        v.setFitHeight(26);
+
+        // the middle band of the picture, where the room is
+        v.setViewport(new javafx.geometry.Rectangle2D(
+                0, img.getHeight() * 0.30, img.getWidth(), img.getHeight() * 0.34));
+
+        StackPane frame = new StackPane(v);
+        frame.setStyle("-fx-border-color: " + INK + "; -fx-border-width: 1;");
+        frame.setMinSize(78, 28);
+        frame.setMaxSize(78, 28);
+
+        return frame;
+    }
+
+    /** The speaker's own face, cropped to the head, for the log's lines. */
+    private Node face(String speaker) {
+
+        if (speaker == null || speaker.isBlank()) {
+            return null;
+        }
+
+        String wanted = speaker.trim().toUpperCase();
+        String path = null;
+
+        for (java.util.Map.Entry<String, String> e : FACES.entrySet()) {
+            if (Lang.t(e.getKey()).toUpperCase().equals(wanted)) {
+                path = e.getValue();
+                break;
+            }
+        }
+
+        Image img = path == null ? null : loadImage(path);
+
+        if (img == null) {
+            return null;
+        }
+
+        double side = img.getWidth() * 0.38;
+
+        ImageView v = new ImageView(img);
+        v.setPreserveRatio(false);
+        v.setSmooth(true);
+        v.setFitWidth(44);
+        v.setFitHeight(44);
+        v.setViewport(new javafx.geometry.Rectangle2D(
+                img.getWidth() * 0.26, img.getHeight() * 0.02, side, side));
+
+        StackPane frame = new StackPane(v);
+        frame.setMinSize(46, 46);
+        frame.setMaxSize(46, 46);
+        frame.setStyle("-fx-background-color: " + PAGE + ";"
+                + "-fx-border-color: " + INK + "; -fx-border-width: 1;");
+
+        return frame;
     }
 
     /** A line that was said. Narration has no speaker, so it keeps its italics. */
@@ -1577,19 +1699,31 @@ public class GameUI {
         text.setTextFill(Color.web(narration ? GRAY : INK));
         text.setWrapText(true);
 
-        VBox box = new VBox(2);
-        box.setPadding(new Insets(7, 0, 7, narration ? 14 : 0));
+        VBox said = new VBox(2);
 
         if (!narration) {
             Label who = new Label(spaced(e.speaker().toUpperCase()));
             who.setFont(label(9));
             who.setTextFill(Color.web(GRAY));
-            box.getChildren().add(who);
+            said.getChildren().add(who);
         }
 
-        box.getChildren().add(text);
+        said.getChildren().add(text);
+        HBox.setHgrow(said, Priority.ALWAYS);
 
-        return box;
+        Node portrait = narration ? null : face(e.speaker());
+
+        if (portrait == null) {
+            VBox box = new VBox(said);
+            box.setPadding(new Insets(7, 0, 7, narration ? 14 : 0));
+            return box;
+        }
+
+        HBox row = new HBox(12, portrait, said);
+        row.setAlignment(Pos.TOP_LEFT);
+        row.setPadding(new Insets(7, 0, 7, 0));
+
+        return row;
     }
 
     /** A decision, laid out exactly as the chapter summary lays one out. */

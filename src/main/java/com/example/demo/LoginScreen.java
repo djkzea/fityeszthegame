@@ -10,6 +10,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
@@ -42,6 +44,11 @@ public final class LoginScreen {
     private static final String GREEN = "#1F6B3A";   // --second
     private static final String GRAY  = "#4A4640";   // --inkSoft
     private static final String RULE  = "#CFC6B6";   // --line
+
+    private static final String ART = "/com/example/demo/fityesz_art/opening/";
+
+    /** The cast inside its 1200x630 sheet, cropped to the figures - as the title page crops it. */
+    private static final javafx.geometry.Rectangle2D CAST = new javafx.geometry.Rectangle2D(358, 180, 789, 335);
 
     private final StackPane root = new StackPane();
 
@@ -144,15 +151,63 @@ public final class LoginScreen {
         bar.setMouseTransparent(true);
         StackPane.setAlignment(bar, Pos.TOP_CENTER);
 
-        Label wordmark = new Label(spaced(Lang.t("ui.title").toUpperCase()));
-        wordmark.setFont(Font.font(label(), 10));
-        wordmark.setTextFill(Color.web(GRAY));
+        // The title page's own furniture: the printed plate behind everything, the
+        // cast standing in the bottom right corner, the wordmark over the form.
+        Region plate = new Region();
+        java.net.URL paper = LoginScreen.class.getResource(ART + "opening_plate.jpg");
 
-        VBox column = new VBox(14, wordmark, sheet);
+        if (paper != null) {
+            plate.setStyle("-fx-background-image: url('" + paper.toExternalForm() + "');"
+                    + "-fx-background-size: cover;"
+                    + "-fx-background-position: center;"
+                    + "-fx-background-repeat: no-repeat;");
+        }
+
+        plate.setOpacity(0.5);
+        plate.setMouseTransparent(true);
+
+        ImageView cast = new ImageView();
+        Image people = image(ART + "opening_people.png");
+
+        if (people != null) {
+            cast.setImage(people);
+            cast.setViewport(CAST);
+        }
+
+        cast.setPreserveRatio(true);
+        cast.setSmooth(true);
+        cast.setMouseTransparent(true);
+        cast.setOpacity(0.92);
+        cast.fitWidthProperty().bind(root.widthProperty().multiply(0.56));
+        cast.fitHeightProperty().bind(root.heightProperty().multiply(0.52));
+        StackPane.setAlignment(cast, Pos.BOTTOM_RIGHT);
+
+        ImageView wordmark = new ImageView();
+        Image mark = image(ART + "opening_wordmark.png");
+
+        if (mark != null) {
+            wordmark.setImage(mark);
+        }
+
+        wordmark.setPreserveRatio(true);
+        wordmark.setSmooth(true);
+        wordmark.setFitWidth(240);
+
+        // the second word of the lockup, set under FITYESZ the way the poster sets it
+        Label chronicle = new Label(spaced(Lang.magyar() ? "KRÓNIKA" : "CHRONICLE"));
+        chronicle.setFont(Font.font(head(), 15));
+        chronicle.setTextFill(Color.web(RED_D));
+        chronicle.setPadding(new Insets(2, 0, 0, 100));
+
+        VBox lockup = new VBox(0, wordmark, chronicle);
+
+        VBox column = new VBox(16, lockup, sheet);
         column.setAlignment(Pos.CENTER_LEFT);
         column.setMaxSize(430, Region.USE_PREF_SIZE);
+        StackPane.setAlignment(column, Pos.CENTER_LEFT);
+        StackPane.setMargin(column, new Insets(0, 0, 0, 72));
 
-        root.getChildren().addAll(column, bar);
+        root.getChildren().addAll(plate, cast, column, bar);
 
         showMode();
 
@@ -354,6 +409,13 @@ public final class LoginScreen {
         b.setOnMouseExited(e -> b.setStyle(base + GRAY + ";"));
 
         return b;
+    }
+
+    private static Image image(String path) {
+
+        java.net.URL url = LoginScreen.class.getResource(path);
+
+        return url == null ? null : new Image(url.toExternalForm());
     }
 
     private static Region segment(String colour) {

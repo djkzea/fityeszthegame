@@ -49,6 +49,41 @@ class ResumeSmokeTest {
         return out.get();
     }
 
+    /**
+     * The save that has no stage at all - one from the website, or one written
+     * before the game remembered it. Without a fallback the run opens on an
+     * empty stage and then saves that emptiness back, which is how the missing
+     * background survived its first fix.
+     */
+    @Test
+    void aSaveWithNoStageOpensOnItsChaptersOwn() throws Exception {
+
+        Path home = Files.createTempDirectory("fityesz-home");
+        System.setProperty("user.home", home.toString());
+
+        try {
+            Platform.startup(() -> { });
+        } catch (IllegalStateException alreadyRunning) {
+            // another test started the toolkit first
+        }
+
+        SaveData bare = new SaveData("Zsomi", "Zsomi", 2, "lakatosRules",
+                40, 10, 1, List.of(), List.of(new SaveData.Decision("ch1.q1", 0)),
+                List.of(), null, null, "2026-10-17T19:13:11Z");
+
+        GameController controller = onFxThread(() -> {
+            GameController c = new GameController(new Stage());
+            c.resume(bare);
+            return c;
+        });
+
+        SaveData.Scenery stage = onFxThread(controller::snapshot).scenery();
+
+        assertEquals("/com/example/demo/fityesz_art/bg/ch2_hall.png", stage.background());
+        assertTrue(stage.chapter().contains("2"), "a fejezetsor nem a 2. fejezete: " + stage.chapter());
+        assertNotEquals(Lang.t("ui.title").toUpperCase(), stage.chapter());
+    }
+
     @Test
     void aRestoredRunReopensItsSceneAndKeepsSaving() throws Exception {
 
