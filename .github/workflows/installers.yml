@@ -1,0 +1,67 @@
+# Three installers from three machines.
+#
+# jpackage only ever builds for the platform it runs on, so the matrix is not a
+# convenience here - it is the only way to get a .dmg, a .msi and a .deb out of
+# one repository.
+name: Installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: ./packaging/package.sh
+          - os: ubuntu-latest
+            script: ./packaging/package.sh
+          - os: windows-latest
+            script: packaging\package.bat
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: liberica
+          java-version: '25'
+          cache: maven
+
+      # The anon key is public by design - the website hands it to every visitor
+      # - but it is not in the repository, so the build takes it from the repo's
+      # secrets. Without it the game still builds and plays; it just has no
+      # accounts and no cloud saves.
+      - name: Supabase keys
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.SUPABASE_URL }}" ]; then
+            printf 'url=%s\nanonKey=%s\n' \
+              "${{ secrets.SUPABASE_URL }}" "${{ secrets.SUPABASE_ANON_KEY }}" \
+              > src/main/resources/com/example/demo/supabase.properties
+          else
+            echo "no Supabase secrets set - building without accounts"
+          fi
+
+      - name: WiX (Windows installers need it)
+        if: runner.os == 'Windows'
+        run: choco install wixtoolset --no-progress -y
+
+      - name: Build the installer
+        shell: bash
+        run: |
+          chmod +x ./packaging/package.sh || true
+          ${{ matrix.script }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fityesz-kronika-${{ runner.os }}
+          path: |
+            target/installer/*
+          if-no-files-found: error
