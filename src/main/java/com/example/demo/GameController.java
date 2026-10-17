@@ -13,7 +13,8 @@ public class GameController {
 
     private final java.util.List<GameUI.SummaryDecision> chapterDecisions = new java.util.ArrayList<>();
 
-    private void recordDecision(String questionKey, String answerText, int xpDelta, int exposureDelta) {
+    private void recordDecision(String questionKey, int choice, String answerText,
+                                int xpDelta, int exposureDelta) {
 
         StringBuilder points = new StringBuilder();
 
@@ -29,12 +30,48 @@ public class GameController {
         chapterDecisions.add(
                 new GameUI.SummaryDecision(Lang.t(questionKey), answerText, points.toString())
         );
+
+        // The website keys a decision by the question's own key and a zero-based
+        // option index (lib/story/types.ts, Decision) - the same vocabulary, so a
+        // run started there can be read here and the other way round.
+        history.add(new SaveData.Decision(questionKey, Math.max(0, choice - 1)));
+
+        chatlog.choice(currentChapter, Lang.t(questionKey), answerText, xpDelta, exposureDelta);
     }
 
     // Boss fight state
     private int previousMove = 0;
     private int sameMove = 0;
     private int peteriPassiveRounds = 0;
+
+    // ==================================================
+    // SAVE
+    // ==================================================
+
+    /** Where each chapter starts, for a save that has no scene of its own - a run from the website. */
+    static final java.util.Map<Integer, String> CHAPTER_ENTRY = java.util.Map.of(
+            0, "showPrologue",
+            1, "chapter1",
+            2, "chapter2",
+            3, "chapter3",
+            4, "chapter4",
+            5, "chapter5",
+            6, "chapter6",
+            7, "chapter7");
+
+    private final Chatlog chatlog = new Chatlog();
+
+    private final SaveStore saves = new SaveStore(AppDirs.data().resolve("save-slot1.json"));
+
+    private final java.util.List<SaveData.Decision> history = new java.util.ArrayList<>();
+
+    /** The scene we are in, as its method name. Written by step(). */
+    private String currentScene = "showStartScreen";
+
+    private int currentChapter = 0;
+
+    /** Off while resume() is putting a save back, so replaying does not overwrite it. */
+    private boolean saving = true;
 
     public GameController(Stage stage) {
         this.stage = stage;
@@ -92,11 +129,152 @@ public class GameController {
         return () -> ui.showItemAcquired(Lang.t(itemKey), next);
     }
 
+    /**
+     * Clears the choices and remembers which scene we are in.
+     *
+     * The scene is this method's caller, read off the stack: a registry of
+     * seventy names would be one more thing to keep in step with the code, and
+     * a typo in it would only show up as a broken save.
+     *
+     * A scene that takes parameters is skipped. chapter1Choice(int) is the
+     * middle of a decision, not a place to come back to, and its argument is
+     * not in the save - so the last parameterless scene stays the return point.
+     */
+    private void step() {
+
+        ui.clearChoices();
+
+        StackWalker.getInstance()
+                .walk(frames -> frames.skip(1).findFirst())
+                .filter(f -> f.getMethodType().parameterCount() == 0)
+                .ifPresent(f -> currentScene = f.getMethodName());
+
+        // Nothing has happened until the player has a name, and a save of the
+        // name prompt would offer itself on the title screen as a run to continue.
+        if (saving && state.getName() != null && !state.getName().isBlank()) {
+            saves.saveLocal(snapshot());
+        }
+    }
+
+    /** Shows a line and writes it into the log. */
+    private void say(String speaker, String text) {
+        chatlog.line(currentChapter, speaker, text);
+        ui.showDialogue(speaker, text);
+    }
+
+    /** The run as it stands. */
+    SaveData snapshot() {
+
+        return new SaveData(
+                state.getName(),
+                state.getName(),
+                currentChapter,
+                currentScene,
+                state.getXp(),
+                state.getExposure(),
+                state.getLevel(),
+                Item.idsOf(state),
+                java.util.List.copyOf(history),
+                chatlog.entries(),
+                new SaveData.Fight(
+                        state.getPlayerHp(), state.getBossHp(),
+                        previousMove, sameMove, peteriPassiveRounds),
+                java.time.Instant.now().toString());
+    }
+
+    /**
+     * Puts a saved run back and reopens its scene.
+     *
+     * A save from the website has no scene of its own, so the chapter's first
+     * scene is where it picks up. An unknown scene name - a method renamed
+     * since the save was written - does the same rather than failing.
+     */
+    public void resume(SaveData data) {
+
+        ui.updateLanguage();
+
+        state = new GameState();
+        state.setName(data.playerName() == null ? "" : data.playerName());
+        state.addXp(data.xp());
+        state.addExposure(data.lebukas());
+        Item.apply(data.items(), state);
+
+        history.clear();
+
+        if (data.history() != null) {
+            history.addAll(data.history());
+        }
+
+        chatlog.load(data.log());
+        chapterDecisions.clear();
+
+        previousMove = 0;
+        sameMove = 0;
+        peteriPassiveRounds = 0;
+
+        if (data.fight() != null) {
+            state.setPlayerHp(data.fight().playerHp());
+            state.setBossHp(data.fight().bossHp());
+            previousMove = data.fight().previousMove();
+            sameMove = data.fight().sameMove();
+            peteriPassiveRounds = data.fight().peteriPassiveRounds();
+        }
+
+        currentChapter = data.chapter();
+
+        ui.resetForNewGame();
+        ui.updateStats(state);
+        ui.hideRestartButton();
+
+        String scene = data.scene() == null || data.scene().isBlank()
+                ? CHAPTER_ENTRY.getOrDefault(data.chapter(), "showStartScreen")
+                : data.scene();
+
+        // The replayed scene writes its own save; hold that off until it is on
+        // screen, so a restore cannot overwrite the save it came from.
+        saving = false;
+
+        try {
+            runScene(scene);
+
+        } catch (ReflectiveOperationException e) {
+            System.err.println("resume: nincs ilyen jelenet: " + scene);
+
+            try {
+                runScene(CHAPTER_ENTRY.getOrDefault(data.chapter(), "showStartScreen"));
+            } catch (ReflectiveOperationException fallback) {
+                showStartScreen();
+            }
+
+        } finally {
+            saving = true;
+        }
+    }
+
+    private void runScene(String name) throws ReflectiveOperationException {
+        GameController.class.getDeclaredMethod(name).invoke(this);
+    }
+
+    /** The pause menu's SAVE, and every chapter boundary. */
+    public void saveNow(boolean toCloud) {
+        saves.saveLocal(snapshot());
+    }
+
+    /** The log the napló overlay reads. */
+    public Chatlog chatlog() {
+        return chatlog;
+    }
+
     private void restartGame() {
 
         state = new GameState();
 
         chapterDecisions.clear();
+
+        history.clear();
+        chatlog.clear();
+        currentChapter = 0;
+        saving = true;
 
         previousMove = 0;
         sameMove = 0;
@@ -121,6 +299,8 @@ public class GameController {
      */
     private void setChapterHeader(int chapter, String title) {
 
+        currentChapter = chapter;
+
         String prefix = chapter == 0
                 ? Lang.t("ui.prologue")
                 : Lang.magyar()
@@ -131,13 +311,13 @@ public class GameController {
     }
 
     private void showStartScreen() {
-        ui.clearChoices();
+        step();
 
         ui.hideRestartButton();
 
         setChapterHeader(0, Lang.t("pro.name"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("intro.welcome") + "\n\n"
                         + Lang.t("intro.1") + "\n\n"
@@ -166,9 +346,9 @@ public class GameController {
     // ==================================================
 
     private void showPrologue() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.you"),
                 Lang.t("pro.youAre", state.getName())
         );
@@ -177,9 +357,9 @@ public class GameController {
     }
 
     private void prologueTeacher() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 "",
                 Lang.t("pro.teacher") + "\n\n"
                         + Lang.t("pro.salary") + "\n\n"
@@ -190,9 +370,9 @@ public class GameController {
     }
 
     private void prologueBank() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 "",
                 Lang.t("pro.bank") + "\n\n"
                         + Lang.t("pro.politician")
@@ -202,18 +382,18 @@ public class GameController {
     }
 
     private void prologuePhone() {
-        ui.clearChoices();
+        step();
 
         // the phone ringing is something that happens, not something anyone says
-        ui.showDialogue("", Lang.t("pro.phone"));
+        say("", Lang.t("pro.phone"));
 
         ui.addChoice(1, Lang.t("ui.enter"), this::prologueCall);
     }
 
     private void prologueCall() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("pro.call", state.getName())
         );
@@ -227,7 +407,7 @@ public class GameController {
 
     private void chapter1() {
         setChapterHeader(1, Lang.t("ch1.title"));
-        ui.clearChoices();
+        step();
 
         ui.showImage(
                 "/com/example/demo/fityesz_art/bg/ch1_cafe.png"
@@ -238,7 +418,7 @@ public class GameController {
                 Lang.t("npc.lipoti.role")
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.chapter"),
                 Lang.t("ch1.title") + "\n\n"
                         + Lang.t("ch1.quote") + "\n\n"
@@ -252,7 +432,7 @@ public class GameController {
     }
 
     private void lipotiIntroduction() {
-        ui.clearChoices();
+        step();
 
         ui.showCharacter(
                 "/com/example/demo/fityesz_art/characters/lipoti.png",
@@ -260,7 +440,7 @@ public class GameController {
                 Lang.t("npc.lipoti.role")
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lipoti"),
                 Lang.t("ch1.lipoti1", state.getName())
         );
@@ -273,7 +453,7 @@ public class GameController {
     }
 
     private void lipotiOffer() {
-        ui.clearChoices();
+        step();
 
         ui.showCharacter(
                 "/com/example/demo/fityesz_art/characters/lipoti2.png",
@@ -281,7 +461,7 @@ public class GameController {
                 Lang.t("npc.lipoti.role")
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lipoti"),
                 Lang.t("ch1.lipoti2")
         );
@@ -291,7 +471,7 @@ public class GameController {
     }
 
     private void chapter1Question() {
-        ui.clearChoices();
+        step();
 
         ui.setChoicePrompt(Lang.t("ch1.q1"));
 
@@ -315,7 +495,7 @@ public class GameController {
     }
 
     private void chapter1Choice(int choice) {
-        ui.clearChoices();
+        step();
 
         int xpDelta;
         int exposureDelta;
@@ -324,7 +504,7 @@ public class GameController {
             xpDelta = 15;
             exposureDelta = 10;
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.lipoti"),
                     Lang.t("ch1.q1.ans1")
             );
@@ -332,7 +512,7 @@ public class GameController {
             xpDelta = 10;
             exposureDelta = 5;
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.lipoti"),
                     Lang.t("ch1.q1.ans2")
             );
@@ -340,7 +520,7 @@ public class GameController {
             xpDelta = 5;
             exposureDelta = 0;
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.lipoti"),
                     Lang.t("ch1.q1.ans3")
             );
@@ -348,7 +528,7 @@ public class GameController {
 
         state.addXp(xpDelta);
         state.addExposure(exposureDelta);
-        recordDecision("ch1.q1", Lang.t("ch1.q1.opt" + choice), xpDelta, exposureDelta);
+        recordDecision("ch1.q1", choice, Lang.t("ch1.q1.opt" + choice), xpDelta, exposureDelta);
 
         ui.updateStats(state);
 
@@ -356,9 +536,9 @@ public class GameController {
     }
 
     private void lipotiEnvelopeIntroduction() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lipoti"),
                 Lang.t("ch1.lipoti3", state.getName())
         );
@@ -367,17 +547,17 @@ public class GameController {
     }
 
     private void showEnvelope() {
-        ui.clearChoices();
+        step();
 
         ui.hideCharacter();
 
-        ui.showDialogue("", Lang.t("ch1.envelope"));
+        say("", Lang.t("ch1.envelope"));
 
         ui.addChoice(1, Lang.t("ui.enter"), this::envelopeOffer);
     }
 
     private void envelopeOffer() {
-        ui.clearChoices();
+        step();
 
         ui.showCharacter(
                 "/com/example/demo/fityesz_art/characters/lipoti2.png",
@@ -385,7 +565,7 @@ public class GameController {
                 Lang.t("npc.lipoti.role")
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lipoti"),
                 Lang.t("ch1.lipoti4")
         );
@@ -394,7 +574,7 @@ public class GameController {
     }
 
     private void envelopeQuestion() {
-        ui.clearChoices();
+        step();
 
         ui.setChoicePrompt(Lang.t("ch1.q2"));
 
@@ -418,7 +598,7 @@ public class GameController {
     }
 
     private void envelopeChoice(int choice) {
-        ui.clearChoices();
+        step();
 
         int xpDelta;
         int exposureDelta;
@@ -429,12 +609,12 @@ public class GameController {
             state.setFirstEnvelope(true);
 
             ui.hideCharacter();
-            ui.showDialogue("", Lang.t("ch1.q2.ans1"));
+            say("", Lang.t("ch1.q2.ans1"));
         } else if (choice == 2) {
             xpDelta = 10;
             exposureDelta = 5;
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.lipoti"),
                     Lang.t("ch1.q2.ans2")
             );
@@ -442,7 +622,7 @@ public class GameController {
             xpDelta = 0;
             exposureDelta = -10;
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.lipoti"),
                     Lang.t("ch1.q2.ans3")
             );
@@ -450,7 +630,7 @@ public class GameController {
 
         state.addXp(xpDelta);
         state.addExposure(exposureDelta);
-        recordDecision("ch1.q2", Lang.t("ch1.q2.opt" + choice), xpDelta, exposureDelta);
+        recordDecision("ch1.q2", choice, Lang.t("ch1.q2.opt" + choice), xpDelta, exposureDelta);
 
         ui.updateStats(state);
 
@@ -487,14 +667,14 @@ public class GameController {
 
     private void chapter2() {
         setChapterHeader(2, Lang.t("ch2.title"));
-        ui.clearChoices();
+        step();
 
         ui.showImage(
                 "/com/example/demo/fityesz_art/bg/ch2_hall.png"
         );
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.chapter"),
                 Lang.t("ch2.title") + "\n\n"
                         + Lang.t("ch2.quote") + "\n\n"
@@ -505,11 +685,11 @@ public class GameController {
     }
 
     private void chapter2Inside() {
-        ui.clearChoices();
+        step();
 
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch2.narr1") + "\n\n"
                         + Lang.t("ch2.narr2")
@@ -519,11 +699,11 @@ public class GameController {
     }
 
     private void lakatosIntroduction() {
-        ui.clearChoices();
+        step();
 
         ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png", Lang.t("npc.lakatos"), Lang.t("npc.lakatos.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lakatos"),
                 Lang.t("ch2.lakatos1", state.getName())
         );
@@ -532,10 +712,10 @@ public class GameController {
     }
 
     private void lakatosRules() {
-        ui.clearChoices();
+        step();
         ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin2.png", Lang.t("npc.lakatos"), Lang.t("npc.lakatos.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lakatos"),
                 Lang.t("ch2.lakatos2")
         );
@@ -544,10 +724,10 @@ public class GameController {
     }
 
     private void lakatosChoice() {
-        ui.clearChoices();
+        step();
         ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png", Lang.t("npc.lakatos"), Lang.t("npc.lakatos.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lakatos"),
                 Lang.t("ch2.q")
         );
@@ -572,14 +752,14 @@ public class GameController {
     }
 
     private void lakatosChoiceResult(int choice) {
-        ui.clearChoices();
+        step();
 
         if (choice == 1) {
             state.addXp(25);
             state.addExposure(20);
             state.setSmallEnvelope(true);
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.lakatos"),
                     Lang.t("ch2.q.ans1")
             );
@@ -587,14 +767,14 @@ public class GameController {
             state.addXp(10);
             state.addExposure(5);
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.lakatos"),
                     Lang.t("ch2.q.ans2")
             );
         } else {
             state.addXp(5);
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.lakatos"),
                     Lang.t("ch2.q.ans3")
             );
@@ -604,7 +784,7 @@ public class GameController {
 
         int[] xpByChoice = {25, 10, 5};
         int[] exposureByChoice = {20, 5, 0};
-        recordDecision("ch2.q", Lang.t("ch2.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
+        recordDecision("ch2.q", choice, Lang.t("ch2.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
 
         Runnable afterLakatosTalk = chapterSummary(2, this::chapter3);
 
@@ -621,12 +801,12 @@ public class GameController {
 
     private void chapter3() {
         setChapterHeader(3, Lang.t("ch3.title"));
-        ui.clearChoices();
+        step();
 
         ui.showImage("/com/example/demo/fityesz_art/bg/ch3_hall.png");
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.chapter"),
                 Lang.t("ch3.title") + "\n\n"
                         + Lang.t("ch3.quote") + "\n\n"
@@ -637,9 +817,9 @@ public class GameController {
     }
 
     private void congressStory() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch3.t1") + "\n\n"
                         + Lang.t("ch3.t2")
@@ -649,9 +829,9 @@ public class GameController {
     }
 
     private void congressSpeech() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.speaker"),
                 Lang.t("ch3.speaker1")
         );
@@ -660,11 +840,11 @@ public class GameController {
     }
 
     private void congressCrowd() {
-        ui.clearChoices();
+        step();
 
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch3.narr1")
         );
@@ -673,12 +853,12 @@ public class GameController {
     }
 
     private void kapzsSpeech1() {
-        ui.clearChoices();
+        step();
 
         ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre.png", Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 Lang.t("ch3.kapzs1")
         );
@@ -687,11 +867,11 @@ public class GameController {
     }
 
     private void kapzsSpeech2() {
-        ui.clearChoices();
+        step();
 
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch3.narr2")
         );
@@ -700,11 +880,11 @@ public class GameController {
     }
 
     private void kapzsSpeech3() {
-        ui.clearChoices();
+        step();
 
         ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre.png", Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 Lang.t("ch3.kapzs2")
         );
@@ -713,11 +893,11 @@ public class GameController {
     }
 
     private void congressEnd() {
-        ui.clearChoices();
+        step();
 
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch3.narr3") + "\n\n"
                         + Lang.t("ch3.narr4")
@@ -731,9 +911,9 @@ public class GameController {
     // ==================================================
 
     private void bossIntroduction() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("boss1.rule1") + "\n"
                         + Lang.t("boss1.rule2")
@@ -756,14 +936,14 @@ public class GameController {
         previousMove = 0;
         sameMove = 0;
 
-        ui.clearChoices();
+        step();
 
         ui.clearBossAbilities();
         ui.addBossAbility(Lang.t("boss1.skill"), Lang.t("boss1.ab.desc"));
 
         ui.showCharacter("/com/example/demo/fityesz_art/characters/lakatoservin.png", Lang.t("npc.lakatos"), Lang.t("npc.lakatos.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lakatos"),
                 Lang.t("boss1.skill")
         );
@@ -778,7 +958,7 @@ public class GameController {
     }
 
     private void addBossButtons() {
-        ui.clearChoices();
+        step();
 
         ui.showBossFight(
                 Lang.t("npc.lakatos"),
@@ -875,7 +1055,7 @@ public class GameController {
                 state.getBossHp()
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lakatos"),
                 result
         );
@@ -904,12 +1084,12 @@ public class GameController {
 
         state.addXp(50);
         state.setLakatosFile(true);
-        recordDecision("sum.boss", Lang.t("boss1.win"), 50, 0);
+        recordDecision("sum.boss", 1, Lang.t("boss1.win"), 50, 0);
 
         ui.updateStats(state);
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.lakatos"),
                 Lang.t("boss1.win")
         );
@@ -927,10 +1107,10 @@ public class GameController {
 
     private void playerDefeated() {
         ui.hideBossFight();
-        ui.clearChoices();
+        step();
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("ui.defeat")
         );
@@ -958,11 +1138,11 @@ public class GameController {
 
     private void chapter4() {
         setChapterHeader(4, Lang.t("ch4.title"));
-        ui.clearChoices();
+        step();
         ui.showImage("/com/example/demo/fityesz_art/bg/ch4_office.png");
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.chapter"),
                 Lang.t("ch4.title") + "\n\n"
                         + Lang.t("ch4.quote") + "\n\n"
@@ -981,9 +1161,9 @@ public class GameController {
 // ==================================================
 
     private void chapter4Meeting() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch4.t1") + "\n\n"
                         + Lang.t("ch4.t2")
@@ -997,10 +1177,10 @@ public class GameController {
     }
 
     private void chapter4Peteri() {
-        ui.clearChoices();
+        step();
         ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin.png", Lang.t("npc.peteri"), Lang.t("npc.peteri.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.peteri"),
                 Lang.t("ch4.peteri1", state.getName())
         );
@@ -1013,10 +1193,10 @@ public class GameController {
     }
 
     private void chapter4Conversation() {
-        ui.clearChoices();
+        step();
         ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin2.png", Lang.t("npc.peteri"), Lang.t("npc.peteri.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.peteri"),
                 Lang.t("ch4.peteri2") + "\n\n"
                         + Lang.t("ch4.q")
@@ -1044,7 +1224,7 @@ public class GameController {
 
     private void chapter4Choice(int choice) {
 
-        ui.clearChoices();
+        step();
 
         if (choice == 1) {
 
@@ -1052,7 +1232,7 @@ public class GameController {
             state.addExposure(20);
             state.setOffshoreCode(true);
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.unknown"),
                     Lang.t("ch4.q.ans1")
             );
@@ -1064,7 +1244,7 @@ public class GameController {
             state.addXp(15);
             state.addExposure(10);
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.unknown"),
                     Lang.t("ch4.q.ans2")
             );
@@ -1076,7 +1256,7 @@ public class GameController {
             state.addXp(5);
             state.addExposure(-5);
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.unknown"),
                     Lang.t("ch4.q.ans3")
             );
@@ -1086,7 +1266,7 @@ public class GameController {
 
         int[] xpByChoice = {25, 15, 5};
         int[] exposureByChoice = {20, 10, -5};
-        recordDecision("ch4.q", Lang.t("ch4.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
+        recordDecision("ch4.q", choice, Lang.t("ch4.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
 
         Runnable toChapter5 = chapterSummary(4, this::chapter5);
 
@@ -1100,7 +1280,7 @@ public class GameController {
     private void chapter5() {
         setChapterHeader(5, Lang.t("ch5.title"));
 
-        ui.clearChoices();
+        step();
 
         ui.showImage(
                 "/com/example/demo/fityesz_art/bg/ch5_corridor.png"
@@ -1109,7 +1289,7 @@ public class GameController {
 
         // Chapters 1-4 open on a title card. This one started mid-scene, which is
         // why chapter five never announced where it was happening.
-        ui.showDialogue(
+        say(
                 Lang.t("ui.chapter"),
                 Lang.t("ch5.title") + "\n\n"
                         + Lang.t("ch5.quote") + "\n\n"
@@ -1120,9 +1300,9 @@ public class GameController {
     }
 
     private void chapter5Intro() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch5.t1")
         );
@@ -1136,9 +1316,9 @@ public class GameController {
 
     private void chapter5Story() {
 
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch5.t2")
         );
@@ -1152,12 +1332,12 @@ public class GameController {
 
     private void chapter5Molnar() {
 
-        ui.clearChoices();
+        step();
 
         ui.showCharacter("/com/example/demo/fityesz_art/characters/molnar.png", Lang.t("npc.molnar"), Lang.t("npc.molnar.role"));
 
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.molnar"),
                 Lang.t("ch5.molnar1", state.getName()) + "\n\n" + Lang.t("ch5.narr1")
         );
@@ -1171,10 +1351,10 @@ public class GameController {
 
     private void chapter5Conversation() {
 
-        ui.clearChoices();
+        step();
         ui.showCharacter("/com/example/demo/fityesz_art/characters/molnar2.png", Lang.t("npc.molnar"), Lang.t("npc.molnar.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.molnar"),
                 Lang.t("ch5.molnar2") + "\n\n"
                         + Lang.t("ch5.q")
@@ -1201,7 +1381,7 @@ public class GameController {
 
     private void chapter5Choice(int choice) {
 
-        ui.clearChoices();
+        step();
         ui.hideCharacter();
 
         if (choice == 1) {
@@ -1210,7 +1390,7 @@ public class GameController {
             state.addExposure(20);
             state.setParliamentKey(true);
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.unknown"),
                     Lang.t("ch5.q.ans1")
             );
@@ -1220,7 +1400,7 @@ public class GameController {
             state.addXp(10);
             state.addExposure(10);
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.unknown"),
                     Lang.t("ch5.q.ans2", state.getName())
             );
@@ -1230,7 +1410,7 @@ public class GameController {
             state.addXp(15);
             state.addExposure(-5);
 
-            ui.showDialogue(
+            say(
                     Lang.t("npc.unknown"),
                     Lang.t("ch5.q.ans3")
             );
@@ -1240,7 +1420,7 @@ public class GameController {
 
         int[] xpByChoice = {25, 10, 15};
         int[] exposureByChoice = {20, 10, -5};
-        recordDecision("ch5.q", Lang.t("ch5.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
+        recordDecision("ch5.q", choice, Lang.t("ch5.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
 
         Runnable toPreparation = this::chapter5Preparation;
 
@@ -1253,9 +1433,9 @@ public class GameController {
 
     private void chapter5Preparation() {
 
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch5.pre1")
         );
@@ -1269,9 +1449,9 @@ public class GameController {
 
     private void boss2Introduction() {
 
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("ch5.pre2")
         );
@@ -1291,14 +1471,14 @@ public class GameController {
         sameMove = 0;
         peteriPassiveRounds = 0;
 
-        ui.clearChoices();
+        step();
 
         ui.clearBossAbilities();
         ui.addBossAbility(Lang.t("boss2.skill"), Lang.t("boss2.ab.desc"));
 
         ui.showCharacter("/com/example/demo/fityesz_art/characters/drpeterikatalin.png", Lang.t("npc.peteri"), Lang.t("npc.peteri.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.peteri"),
                 Lang.t("boss2.skill") + "\n\n"
                         + Lang.t("boss2.ab.desc")
@@ -1315,7 +1495,7 @@ public class GameController {
 
     private void addPeteriBossButtons() {
 
-        ui.clearChoices();
+        step();
 
         ui.showBossFight(
                 Lang.t("npc.peteri"),
@@ -1412,7 +1592,7 @@ public class GameController {
                 state.getBossHp()
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.peteri"),
                 result
         );
@@ -1435,10 +1615,10 @@ public class GameController {
     private void playerDefeatedPeteri() {
 
         ui.hideBossFight();
-        ui.clearChoices();
+        step();
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("ui.defeat")
         );
@@ -1462,12 +1642,12 @@ public class GameController {
 
         state.addXp(80);
         state.setPeteriDossier(true);
-        recordDecision("sum.boss", Lang.t("boss2.win"), 80, 0);
+        recordDecision("sum.boss", 1, Lang.t("boss2.win"), 80, 0);
 
         ui.updateStats(state);
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.peteri"),
                 Lang.t("boss2.win")
         );
@@ -1483,14 +1663,14 @@ public class GameController {
         setChapterHeader(6, Lang.t("ch6.title"));
 
         ui.hideBossFight();
-        ui.clearChoices();
+        step();
 
         ui.showImage(
                 "/com/example/demo/fityesz_art/bg/ch6_lodge.png"
         );
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.chapter"),
                 Lang.t("ch6.title") + "\n\n"
                         + Lang.t("ch6.quote") + "\n\n"
@@ -1506,9 +1686,9 @@ public class GameController {
 
     private void chapter6Story() {
 
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ch6.place"),
                 Lang.t("ch6.t1") + "\n\n"
                         + Lang.t("ch6.t2")
@@ -1523,11 +1703,11 @@ public class GameController {
 
     private void kapzsIntroduction() {
 
-        ui.clearChoices();
+        step();
 
         ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre.png", Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 Lang.t("ch6.kapzs1", state.getName())
         );
@@ -1541,24 +1721,24 @@ public class GameController {
 
     private void kapzsConversation() {
 
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 Lang.t("ch6.kapzs2")
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("ch6.narr2")
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 Lang.t("ch6.kapzs3", state.getName())
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("ch6.q")
         );
@@ -1584,7 +1764,7 @@ public class GameController {
 
     private void chapter6Choice(int choice) {
 
-        ui.clearChoices();
+        step();
         ui.hideCharacter();
 
         if (choice == 1) {
@@ -1593,7 +1773,7 @@ public class GameController {
             state.addExposure(15);
             state.setBossTrust(true);
 
-            ui.showDialogue(
+            say(
                     Lang.t("ui.title"),
                     Lang.t("ch6.q.ans1")
             );
@@ -1604,7 +1784,7 @@ public class GameController {
             state.addExposure(5);
             state.setBossTrust(true);
 
-            ui.showDialogue(
+            say(
                     Lang.t("ui.title"),
                     Lang.t("ch6.q.ans2")
             );
@@ -1614,7 +1794,7 @@ public class GameController {
             state.addXp(10);
             state.addExposure(-5);
 
-            ui.showDialogue(
+            say(
                     Lang.t("ui.title"),
                     Lang.t("ch6.q.ans3")
             );
@@ -1624,7 +1804,7 @@ public class GameController {
 
         int[] xpByChoice = {30, 20, 10};
         int[] exposureByChoice = {15, 5, -5};
-        recordDecision("ch6.q", Lang.t("ch6.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
+        recordDecision("ch6.q", choice, Lang.t("ch6.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
 
         ui.addChoice(
                 1,
@@ -1637,14 +1817,14 @@ public class GameController {
         setChapterHeader(7, Lang.t("ch7.title"));
 
         ui.hideBossFight();
-        ui.clearChoices();
+        step();
 
         ui.showImage(
                 "/com/example/demo/fityesz_art/bg/ch7-1_office.png"
         );
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.chapter"),
                 Lang.t("ch7.title") + "\n\n"
                         + Lang.t("ch7.quote") + "\n\n"
@@ -1660,9 +1840,9 @@ public class GameController {
 
     private void chapter7Story() {
 
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ch7.place"),
                 Lang.t("ch7.narr1")
         );
@@ -1676,10 +1856,10 @@ public class GameController {
 
     private void kapzsChapter7() {
 
-        ui.clearChoices();
+        step();
         ui.showCharacter("/com/example/demo/fityesz_art/characters/kapzsimre2.png", Lang.t("npc.kapzs"), Lang.t("npc.kapzs.role"));
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 Lang.t("ch7.kapzs1", state.getName())
         );
@@ -1693,24 +1873,24 @@ public class GameController {
 
     private void chapter7Conversation() {
 
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 Lang.t("ch7.kapzs2")
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("ch7.narr2")
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 Lang.t("ch7.kapzs3", state.getName())
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("ch7.q")
         );
@@ -1736,7 +1916,7 @@ public class GameController {
 
     private void chapter7Choice(int choice) {
 
-        ui.clearChoices();
+        step();
         ui.hideCharacter();
 
 
@@ -1745,7 +1925,7 @@ public class GameController {
             state.addXp(30);
             state.addExposure(20);
 
-            ui.showDialogue(
+            say(
                     Lang.t("ui.title"),
                     Lang.t("ch7.q.ans1")
             );
@@ -1755,7 +1935,7 @@ public class GameController {
             state.addXp(20);
             state.addExposure(10);
 
-            ui.showDialogue(
+            say(
                     Lang.t("ui.title"),
                     Lang.t("ch7.q.ans2")
             );
@@ -1765,7 +1945,7 @@ public class GameController {
             state.addXp(10);
             state.addExposure(-5);
 
-            ui.showDialogue(
+            say(
                     Lang.t("ui.title"),
                     Lang.t("ch7.q.ans3")
             );
@@ -1775,7 +1955,7 @@ public class GameController {
 
         int[] xpByChoice = {30, 20, 10};
         int[] exposureByChoice = {20, 10, -5};
-        recordDecision("ch7.q", Lang.t("ch7.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
+        recordDecision("ch7.q", choice, Lang.t("ch7.q.opt" + choice), xpByChoice[choice - 1], exposureByChoice[choice - 1]);
 
         ui.addChoice(
                 1,
@@ -1788,10 +1968,10 @@ public class GameController {
 
     private void boss3Introduction() {
 
-        ui.clearChoices();
+        step();
         ui.showImage("/com/example/demo/fityesz_art/bg/ch7-2_chamber.png");
 
-        ui.showDialogue(
+        say(
                 Lang.t("boss3.place"),
                 Lang.t("boss3.narr") + "\n\n"
                         + Lang.t("boss3.header").trim() + "\n"
@@ -1811,7 +1991,7 @@ public class GameController {
 
         state.resetBossFight();
 
-        ui.clearChoices();
+        step();
 
         ui.clearBossAbilities();
         ui.addBossAbility(Lang.t("boss3.ab1.name"), Lang.t("boss3.ab1.desc"));
@@ -1824,7 +2004,7 @@ public class GameController {
         // which already lists the rules, and push the top of the screen under the
         // header. Keep only the closing line of the narration.
         String[] introLines = Lang.t("boss3.narr").split("\n");
-        ui.showDialogue(
+        say(
                 Lang.t("boss3.place"),
                 introLines[introLines.length - 1]
         );
@@ -1840,7 +2020,7 @@ public class GameController {
 
     private void addBoss3Buttons() {
 
-        ui.clearChoices();
+        step();
 
         ui.addChoice(
                 1,
@@ -1911,7 +2091,7 @@ public class GameController {
                 state.getBossHp()
         );
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 result
         );
@@ -1932,14 +2112,14 @@ public class GameController {
     private void boss3Defeated() {
 
         ui.hideBossFight();
-        ui.clearChoices();
+        step();
 
         state.addXp(100);
-        recordDecision("sum.boss", Lang.t("boss3.win"), 100, 0);
+        recordDecision("sum.boss", 1, Lang.t("boss3.win"), 100, 0);
 
         ui.updateStats(state);
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.kapzs"),
                 Lang.t("boss3.win")
         );
@@ -1954,10 +2134,10 @@ public class GameController {
     private void playerDefeatedBoss3() {
 
         ui.hideBossFight();
-        ui.clearChoices();
+        step();
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("ui.defeat")
         );
@@ -1979,9 +2159,9 @@ public class GameController {
     // ==================================================
 
     private void endDemo() {
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("end.narr1", state.getName())
         );
@@ -1995,14 +2175,14 @@ public class GameController {
 
     private void endingScene() {
 
-        ui.clearChoices();
+        step();
 
         ui.showImage(
                 "/com/example/demo/fityesz_art/bg/ch7-3_office.png"
         );
         ui.hideCharacter();
 
-        ui.showDialogue(
+        say(
                 Lang.t("ui.title"),
                 Lang.t("end.t1")
         );
@@ -2016,9 +2196,9 @@ public class GameController {
 
     private void endingPlayer() {
 
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.you"),
                 Lang.t("end.you1")
         );
@@ -2032,9 +2212,9 @@ public class GameController {
 
     private void endingFinal() {
 
-        ui.clearChoices();
+        step();
 
-        ui.showDialogue(
+        say(
                 Lang.t("npc.unknown"),
                 Lang.t("end.narr2") + "\n\n"
                         + Lang.t("end.unknown")
