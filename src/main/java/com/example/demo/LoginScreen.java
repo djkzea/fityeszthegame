@@ -75,7 +75,7 @@ public final class LoginScreen {
         this.account = account;
         this.onDone = onDone;
 
-        root.setStyle("-fx-background-color: " + PAGE + ";");
+        root.setStyle("-fx-background-color: " + INK + ";");
         root.setAlignment(Pos.CENTER);
 
         // ----- the sheet's red band, as the summary card wears it -----
@@ -151,63 +151,42 @@ public final class LoginScreen {
         bar.setMouseTransparent(true);
         StackPane.setAlignment(bar, Pos.TOP_CENTER);
 
-        // The title page's own furniture: the printed plate behind everything, the
-        // cast standing in the bottom right corner, the wordmark over the form.
-        Region plate = new Region();
-        java.net.URL paper = LoginScreen.class.getResource(ART + "opening_plate.jpg");
+        // Not the title page again: that one is a cream poster with the cast lined
+        // up on it. This is the other end of the same evening - the office where
+        // the paperwork gets done, dark, with the form lying on the right of the
+        // desk. The lockup is set in type here, because the printed one is black
+        // ink on paper and would disappear into this.
+        Region office = new Region();
+        java.net.URL art = LoginScreen.class.getResource(ART + "login_office.jpg");
 
-        if (paper != null) {
-            plate.setStyle("-fx-background-image: url('" + paper.toExternalForm() + "');"
+        if (art != null) {
+            office.setStyle("-fx-background-image: url('" + art.toExternalForm() + "');"
                     + "-fx-background-size: cover;"
                     + "-fx-background-position: center;"
                     + "-fx-background-repeat: no-repeat;");
         }
 
-        plate.setOpacity(0.5);
-        plate.setMouseTransparent(true);
+        office.setMouseTransparent(true);
 
-        ImageView cast = new ImageView();
-        Image people = image(ART + "opening_people.png");
+        Label name = new Label(spaced(Lang.t("ui.title").toUpperCase()));
+        name.setFont(Font.font(head(), 26));
+        name.setTextFill(Color.web(SHEET));
 
-        if (people != null) {
-            cast.setImage(people);
-            cast.setViewport(CAST);
-        }
+        Region nameRule = new Region();
+        nameRule.setMinSize(56, 3);
+        nameRule.setPrefSize(56, 3);
+        nameRule.setMaxSize(56, 3);
+        nameRule.setStyle("-fx-background-color: " + RED + ";");
 
-        cast.setPreserveRatio(true);
-        cast.setSmooth(true);
-        cast.setMouseTransparent(true);
-        cast.setOpacity(0.92);
-        cast.fitWidthProperty().bind(root.widthProperty().multiply(0.56));
-        cast.fitHeightProperty().bind(root.heightProperty().multiply(0.52));
-        StackPane.setAlignment(cast, Pos.BOTTOM_RIGHT);
+        VBox lockup = new VBox(8, name, nameRule);
 
-        ImageView wordmark = new ImageView();
-        Image mark = image(ART + "opening_wordmark.png");
-
-        if (mark != null) {
-            wordmark.setImage(mark);
-        }
-
-        wordmark.setPreserveRatio(true);
-        wordmark.setSmooth(true);
-        wordmark.setFitWidth(240);
-
-        // the second word of the lockup, set under FITYESZ the way the poster sets it
-        Label chronicle = new Label(spaced(Lang.magyar() ? "KRÓNIKA" : "CHRONICLE"));
-        chronicle.setFont(Font.font(head(), 15));
-        chronicle.setTextFill(Color.web(RED_D));
-        chronicle.setPadding(new Insets(2, 0, 0, 100));
-
-        VBox lockup = new VBox(0, wordmark, chronicle);
-
-        VBox column = new VBox(16, lockup, sheet);
+        VBox column = new VBox(18, lockup, sheet);
         column.setAlignment(Pos.CENTER_LEFT);
         column.setMaxSize(430, Region.USE_PREF_SIZE);
-        StackPane.setAlignment(column, Pos.CENTER_LEFT);
-        StackPane.setMargin(column, new Insets(0, 0, 0, 72));
+        StackPane.setAlignment(column, Pos.CENTER_RIGHT);
+        StackPane.setMargin(column, new Insets(0, 96, 0, 0));
 
-        root.getChildren().addAll(plate, cast, column, bar);
+        root.getChildren().addAll(office, column, bar);
 
         showMode();
 
