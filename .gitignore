@@ -36,3 +36,5 @@ build/
 
 ### Mac OS ###
 .DS_Store
+### Supabase keys, generated from the website project
+src/main/resources/com/example/demo/supabase.properties
