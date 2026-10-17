@@ -18,6 +18,7 @@ import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextFormatter;
 import javafx.scene.control.Label;
@@ -143,6 +144,7 @@ public class GameUI {
     private final Label exposureName, exposureValue;
     private final Label itemsName, itemsValue;
     private final Bar exposureBar;
+    private final Button logButton;
     private final Button restartButton;
     private final Region progressFill;
     private final DoubleProperty progress = new SimpleDoubleProperty(0);
@@ -201,6 +203,12 @@ public class GameUI {
     private final Label summaryNextUp;
     private final Label decisionsHeader;
     private final Button summaryContinueButton;
+
+    // log overlay (the run's transcript)
+    private final StackPane logCard;
+    private final VBox logList = new VBox(10);
+    private final ScrollPane logScroll;
+    private Runnable onLog = null;
 
     // early ending card (exposure reached 100)
     private final StackPane exposedCard;
@@ -358,6 +366,16 @@ public class GameUI {
         itemsValue = statValue("0");
         HBox itemsBox = statBox(itemsName, itemsValue);
 
+        logButton = new Button(Lang.t("ui.log"));
+        logButton.setFont(label(11));
+        logButton.setFocusTraversable(false);
+        styleOutlineButton(logButton);
+        logButton.setOnAction(e -> {
+            if (onLog != null) {
+                onLog.run();
+            }
+        });
+
         restartButton = new Button(Lang.t("ui.restart"));
         restartButton.setFont(label(11));
         restartButton.setFocusTraversable(false);
@@ -372,7 +390,8 @@ public class GameUI {
         // Baseline, not centre: the XP and items groups are as tall as their 20px
         // number while the exposure group is only as tall as its label, so centring
         // each group put them on three slightly different lines.
-        HBox headerRow = new HBox(28, titleBox, headerSpacer, xpBox, exposureBox, itemsBox, restartButton);
+        HBox headerRow = new HBox(28, titleBox, headerSpacer, xpBox, exposureBox, itemsBox,
+                logButton, restartButton);
         headerRow.setAlignment(Pos.BASELINE_LEFT);
         headerRow.setPadding(new Insets(14, 24, 12, 16));
 
@@ -898,6 +917,29 @@ public class GameUI {
         // ASSEMBLE
         // -----------------------------------------------------
 
+        Label logHeading = new Label(Lang.t("ui.log").toUpperCase());
+        logHeading.setFont(head(28));
+        logHeading.setTextFill(Color.web(INK));
+
+        logList.setPadding(new Insets(14, 0, 0, 0));
+
+        logScroll = new ScrollPane(logList);
+        logScroll.setFitToWidth(true);
+        logScroll.setPrefHeight(420);
+        logScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+
+        VBox logContent = new VBox(logHeading, logScroll);
+        logContent.setPadding(new Insets(26, 30, 26, 30));
+        logContent.setMaxWidth(760);
+        logContent.setStyle("-fx-background-color: " + PAPER + ";"
+                + "-fx-border-color: " + INK + ";"
+                + "-fx-border-width: 2;");
+
+        logCard = new StackPane(logContent);
+        logCard.setStyle("-fx-background-color: rgba(22,22,22,0.86);");
+        logCard.setVisible(false);
+        logCard.setManaged(false);
+
         stagePane.getChildren().addAll(
                 ghostPane,
                 backgroundView,
@@ -910,7 +952,8 @@ public class GameUI {
                 itemPopup,
                 titleCard,
                 summaryCard,
-                exposedCard
+                exposedCard,
+                logCard
         );
 
         stagePane.setOnMouseClicked(e -> {
@@ -1423,6 +1466,109 @@ public class GameUI {
     // CHOICES
     // =========================================================
 
+    // =========================================================
+    // LOG OVERLAY
+    // =========================================================
+
+    /** The run's transcript, newest at the bottom. */
+    public void showLog(java.util.List<Chatlog.Entry> entries) {
+
+        logList.getChildren().clear();
+
+        if (entries.isEmpty()) {
+            Label empty = new Label(Lang.t("ui.logEmpty"));
+            empty.setFont(bodyItalic(15));
+            empty.setTextFill(Color.web(GRAY));
+            logList.getChildren().add(empty);
+        }
+
+        int chapter = -1;
+
+        for (Chatlog.Entry e : entries) {
+
+            if (e.chapter() != null && e.chapter() != chapter) {
+                chapter = e.chapter();
+
+                Label mark = new Label((chapter == 0
+                        ? Lang.t("ui.prologue")
+                        : Lang.t("ui.chapter") + " " + chapter).toUpperCase());
+                mark.setFont(label(10));
+                mark.setTextFill(Color.web(RED));
+                VBox.setMargin(mark, new Insets(14, 0, 0, 0));
+                logList.getChildren().add(mark);
+            }
+
+            logList.getChildren().add("choice".equals(e.kind()) ? logChoice(e) : logLine(e));
+        }
+
+        logCard.setVisible(true);
+        logCard.setManaged(true);
+
+        // the latest line is the one the player wants to see
+        javafx.application.Platform.runLater(() -> logScroll.setVvalue(1.0));
+    }
+
+    private Node logLine(Chatlog.Entry e) {
+
+        VBox box = new VBox(2);
+
+        boolean narration = e.speaker() == null || e.speaker().isBlank();
+
+        if (!narration) {
+            Label who = new Label(e.speaker().toUpperCase());
+            who.setFont(label(10));
+            who.setTextFill(Color.web(GRAY));
+            box.getChildren().add(who);
+        }
+
+        Label text = new Label(e.text());
+        text.setFont(narration ? bodyItalic(15) : body(15));
+        text.setTextFill(Color.web(INK));
+        text.setWrapText(true);
+        box.getChildren().add(text);
+
+        return box;
+    }
+
+    private Node logChoice(Chatlog.Entry e) {
+
+        Label question = new Label(Lang.t("ui.decision").toUpperCase() + " · " + e.speaker());
+        question.setFont(label(10));
+        question.setTextFill(Color.web(RED));
+
+        String xp = e.xp() == null || e.xp() == 0 ? "" : (e.xp() > 0 ? "+" : "") + e.xp() + " XP";
+        String lebukas = e.lebukas() == null || e.lebukas() == 0
+                ? ""
+                : (e.lebukas() > 0 ? "+" : "") + e.lebukas();
+
+        String points = xp.isEmpty() || lebukas.isEmpty() ? xp + lebukas : xp + " · " + lebukas;
+
+        Label answer = new Label(e.text() + (points.isEmpty() ? "" : "   " + points));
+        answer.setFont(body(15));
+        answer.setTextFill(Color.web(INK));
+        answer.setWrapText(true);
+
+        VBox box = new VBox(2, question, answer);
+        box.setPadding(new Insets(0, 0, 0, 12));
+        box.setStyle("-fx-border-color: transparent transparent transparent " + RED + ";"
+                + "-fx-border-width: 0 0 0 3;");
+
+        return box;
+    }
+
+    public void hideLog() {
+        logCard.setVisible(false);
+        logCard.setManaged(false);
+    }
+
+    public boolean logVisible() {
+        return logCard.isVisible();
+    }
+
+    public void setOnLog(Runnable action) {
+        onLog = action;
+    }
+
     public void clearChoices() {
 
         choicesBox.getChildren().clear();
@@ -1685,6 +1831,23 @@ public class GameUI {
 
             // early-ending card: swallow keys so nobody restarts by accident
             if (exposedCard.isVisible()) {
+                event.consume();
+                return;
+            }
+
+            // the log is a reader, not a scene: it swallows everything while it is up
+            if (logCard.isVisible()) {
+                if (code == KeyCode.ESCAPE || code == KeyCode.L) {
+                    hideLog();
+                }
+                event.consume();
+                return;
+            }
+
+            if (code == KeyCode.L) {
+                if (onLog != null) {
+                    onLog.run();
+                }
                 event.consume();
                 return;
             }
@@ -2307,6 +2470,7 @@ public class GameUI {
         }
 
         restartButton.setText(Lang.t("ui.restart"));
+        logButton.setText(Lang.t("ui.log"));
         controlsHint.setText(spaced(Lang.t("ui.controls").toUpperCase()));
         xpName.setText(Lang.t("ui.xp").toUpperCase());
         exposureName.setText(Lang.t("ui.exposure").toUpperCase());
