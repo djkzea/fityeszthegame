@@ -107,6 +107,24 @@ public final class Lang {
         p("ui.newGame",          "Új játék", "New Game");
         p("ui.loadGame",         "Játék betöltése", "Load Game");
         p("ui.exit",             "Kilépés", "Exit");
+        p("ui.signOut",          "Kilépés a fiókból", "Sign out");
+        p("ui.save",             "Mentés", "Save");
+        p("ui.saved",            "Mentve", "Saved");
+        p("ui.log",              "Napló", "Log");
+        p("ui.username",         "Felhasználónév", "Username");
+        p("ui.usernameOrEmail",  "Felhasználónév vagy e-mail", "Username or e-mail");
+        p("ui.authFailed",       "Hibás belépési adatok.", "Those sign-in details are not right.");
+        p("ui.authOffline",      "Nincs kapcsolat a kiszolgálóval.", "The server cannot be reached.");
+        p("ui.authUnavailable",  "A fiókok ebben a buildben nincsenek beállítva.",
+                                 "Accounts are not configured in this build.");
+        p("ui.checkEmail",       "Nézd meg a postafiókod, és erősítsd meg az e-mail-címet.",
+                                 "Check your inbox and confirm your e-mail address.");
+        p("ui.noSave",           "Nincs mentés", "No save");
+        p("ui.saveFromLocal",    "ezen a gépen", "on this machine");
+        p("ui.saveFromCloud",    "a fiókodból", "from your account");
+        p("ui.logEmpty",         "Még nem hangzott el semmi.", "Nothing has been said yet.");
+        p("ui.decision",         "Döntés", "Decision");
+        p("ui.back",             "Vissza", "Back");
         p("ui.logIn",            "Bejelentkezés", "Log In");
         p("ui.signUp",           "Regisztráció", "Sign Up");
         p("ui.email",            "Email", "Email");

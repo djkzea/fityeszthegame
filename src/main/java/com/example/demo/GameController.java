@@ -94,6 +94,7 @@ public class GameController {
         this.ui = new GameUI();
 
         ui.setOnGameRestart(this::restartGame);
+        ui.setOnLog(() -> ui.showLog(chatlog.entries()));
 
         // the session from last time, so the title screen already knows the name
         if (account != null) {

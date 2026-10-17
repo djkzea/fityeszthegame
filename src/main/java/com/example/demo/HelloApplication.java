@@ -64,6 +64,9 @@ public class HelloApplication extends Application {
     private boolean keysInstalled = false;
 
     private final List<Button> pauseNav = new ArrayList<>();
+
+    /** Held so its own label can report the save - the lambda refers to it. */
+    private Button pauseSave;
     private int pauseIndex = 0;
 
     @Override
@@ -110,7 +113,23 @@ public class HelloApplication extends Application {
 
     /** A fresh title page wired to this shell. */
     private OpeningScreen title() {
-        return new OpeningScreen(this::enterGame, () -> dip(Platform::exit, 420));
+        return new OpeningScreen(
+                this::enterGame,
+                () -> dip(Platform::exit, 420),
+                this::showLogin,
+                this::enterGame,
+                controller.account(),
+                controller.saves());
+    }
+
+    /** The sign-in screen, and back to a rebuilt title page either way. */
+    private void showLogin() {
+
+        Runnable back = () -> dip(() -> shell.getChildren().set(0, title().getRoot()), 420);
+
+        LoginScreen screen = new LoginScreen(controller.account(), back, back);
+
+        dip(() -> shell.getChildren().set(0, screen.getRoot()), 420);
     }
 
     // ==========================================
@@ -127,6 +146,15 @@ public class HelloApplication extends Application {
 
         if (!inGame) {
             return;              // the title page handles its own keys
+        }
+
+        // an open log is what ESC closes - the pause sheet comes after it
+        if (controller.getUI().logVisible()) {
+            if (e.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
+                controller.getUI().hideLog();
+                e.consume();
+            }
+            return;
         }
 
         if (paused) {
@@ -168,10 +196,21 @@ public class HelloApplication extends Application {
         pauseIndex = 0;
 
         Button resume = pauseItem(hu ? "Folytatás" : "Resume", this::resume);
+
+        pauseSave = pauseItem(Lang.t("ui.save"), () -> {
+            controller.saveNow(true);
+            pauseSave.setText(Lang.t("ui.saved").toUpperCase());
+        });
+
+        Button log = pauseItem(Lang.t("ui.log"), () -> {
+            resume();
+            controller.getUI().showLog(controller.chatlog().entries());
+        });
+
         Button menu = pauseItem(hu ? "Főmenü" : "Main menu", this::toTitle);
         Button quit = pauseItem(Lang.t("ui.exit"), () -> dip(Platform::exit, 420));
 
-        VBox items = new VBox(2, resume, menu, quit);
+        VBox items = new VBox(2, resume, pauseSave, log, menu, quit);
         items.setPadding(new Insets(18, 0, 0, 0));
 
         VBox sheet = new VBox(heading, items);
@@ -280,6 +319,11 @@ public class HelloApplication extends Application {
      * then the game lifts out of it.
      */
     private void enterGame() {
+        enterGame(null);
+    }
+
+    /** The curtain, the card, and then either a fresh run or a saved one. */
+    private void enterGame(SaveData save) {
 
         Node title = shell.getChildren().get(0);
 
@@ -300,7 +344,11 @@ public class HelloApplication extends Application {
             shell.getChildren().set(0, controller.getUI().getRoot());
 
             // started as the curtain lifts, so the first line is already typing
-            controller.begin();
+            if (save == null) {
+                controller.begin();
+            } else {
+                controller.resume(save);
+            }
 
             // once only: the filter stays on the scene for the life of the app
             if (!keysInstalled) {

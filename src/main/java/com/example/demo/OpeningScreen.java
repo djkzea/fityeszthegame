@@ -81,6 +81,10 @@ public class OpeningScreen {
 
     private final Runnable onNewGame;
     private final Runnable onExit;
+    private final Runnable onSignIn;
+    private final java.util.function.Consumer<SaveData> onContinue;
+    private final Account account;
+    private final SaveStore saves;
 
     private boolean splashDone = false;
     private boolean starting = false;
@@ -102,10 +106,16 @@ public class OpeningScreen {
             () -> clamp(root.getHeight() / DESIGN_H, 0.75, 1.6),
             root.heightProperty());
 
-    public OpeningScreen(Runnable onNewGame, Runnable onExit) {
+    public OpeningScreen(Runnable onNewGame, Runnable onExit, Runnable onSignIn,
+                         java.util.function.Consumer<SaveData> onContinue,
+                         Account account, SaveStore saves) {
 
         this.onNewGame = onNewGame;
         this.onExit = onExit;
+        this.onSignIn = onSignIn;
+        this.onContinue = onContinue;
+        this.account = account;
+        this.saves = saves;
 
         loadFont("Antonio-Bold.ttf");
         loadFont("PublicSans-Regular.ttf");
@@ -268,16 +278,42 @@ public class OpeningScreen {
 
         VBox menu = new VBox();
 
-        Button newGame  = menuButton(Lang.t("ui.newGame"),  true,  this::startNewGame);
-        Button loadGame = menuButton(Lang.t("ui.loadGame"), false, null);
-        Button exit     = menuButton(Lang.t("ui.exit"),     true,  onExit);
+        SaveData save = latestSave();
+
+        String who = account == null
+                ? null
+                : account.session().map(Account.Session::displayName).orElse(null);
+
+        Button signIn = menuButton(
+                who == null || who.isBlank() ? Lang.t("ui.logIn") : who,
+                true,
+                who == null
+                        ? onSignIn
+                        : () -> {
+                            account.signOut();
+                            rebuild();
+                        });
+
+        Button newGame  = menuButton(Lang.t("ui.newGame"),  true, this::startNewGame);
+        Button loadGame = menuButton(Lang.t("ui.loadGame"), save != null,
+                save == null ? null : () -> onContinue.accept(save));
+        Button exit     = menuButton(Lang.t("ui.exit"),     true, onExit);
 
         menu.getChildren().addAll(
+                menuRow(signIn, who == null ? null : Lang.t("ui.signOut").toUpperCase()),
                 menuRow(newGame, null),
-                menuRow(loadGame, Lang.magyar() ? "HAMAROSAN" : "SOON"),
+                menuRow(loadGame, save == null
+                        ? Lang.t("ui.noSave").toUpperCase()
+                        : saveNote(save)),
                 menuRow(exit, null));
 
+        nav.add(signIn);
         nav.add(newGame);
+
+        if (save != null) {
+            nav.add(loadGame);
+        }
+
         nav.add(exit);
 
         Label hint = new Label(spaced(Lang.magyar()
@@ -445,6 +481,12 @@ public class OpeningScreen {
 
         Lang.set(code);
 
+        rebuild();
+    }
+
+    /** Builds the column again - after a language change, or a sign-in that changed the menu. */
+    private void rebuild() {
+
         nav.clear();
         selected = null;
 
@@ -460,6 +502,40 @@ public class OpeningScreen {
         if (!nav.isEmpty()) {
             select(nav.get(0));
         }
+    }
+
+    /** The run to offer: the fresher of this machine's and the account's. */
+    private SaveData latestSave() {
+
+        if (saves == null) {
+            return null;
+        }
+
+        SaveData local = saves.loadLocal().orElse(null);
+
+        SaveData cloud = account == null
+                ? null
+                : account.session()
+                        .flatMap(session -> saves.fetchCloud(session.accessToken()))
+                        .orElse(null);
+
+        return SaveStore.newer(local, cloud);
+    }
+
+    /** "3. FEJEZET · A FIÓKODBÓL" - what the LOAD GAME row says on its right. */
+    private String saveNote(SaveData save) {
+
+        String chapter = save.chapter() == 0
+                ? Lang.t("ui.prologue")
+                : (Lang.magyar()
+                        ? save.chapter() + ". " + Lang.t("ui.chapter")
+                        : Lang.t("ui.chapter") + " " + save.chapter());
+
+        String from = save.scene() == null || save.scene().isBlank()
+                ? Lang.t("ui.saveFromCloud")
+                : Lang.t("ui.saveFromLocal");
+
+        return (chapter + " · " + from).toUpperCase();
     }
 
     // ==========================================
