@@ -206,8 +206,11 @@ public class GameUI {
 
     // log overlay (the run's transcript)
     private final StackPane logCard;
-    private final VBox logList = new VBox(10);
+    private final VBox logList = new VBox(0);
     private final ScrollPane logScroll;
+    private final Label logCount = new Label("");
+    private final Label logKicker = new Label("");
+    private final Label logHint = new Label("");
     private Runnable onLog = null;
 
     // early ending card (exposure reached 100)
@@ -917,28 +920,52 @@ public class GameUI {
         // ASSEMBLE
         // -----------------------------------------------------
 
-        Label logHeading = new Label(Lang.t("ui.log").toUpperCase());
-        logHeading.setFont(head(28));
-        logHeading.setTextFill(Color.web(INK));
+        // The log wears the summary card's clothes: a red band with a letter-spaced
+        // kicker, a paper sheet inside an ink border, and the same hairline rules
+        // between rows. The scrollbar is slimmed down by the card's own stylesheet,
+        // because an inline style cannot reach a control's inner parts.
+        logKicker.setText(spaced(Lang.t("ui.log").toUpperCase()));
+        logKicker.setFont(label(11));
+        logKicker.setTextFill(Color.web(PAPER));
+        logKicker.setPadding(new Insets(7, 16, 7, 16));
 
-        logList.setPadding(new Insets(14, 0, 0, 0));
+        logCount.setFont(label(10));
+        logCount.setTextFill(Color.web(PAPER, 0.82));
+        logCount.setPadding(new Insets(7, 16, 7, 16));
+
+        Region logBandSpacer = new Region();
+        HBox.setHgrow(logBandSpacer, Priority.ALWAYS);
+
+        HBox logBand = new HBox(logKicker, logBandSpacer, logCount);
+        logBand.setAlignment(Pos.CENTER_LEFT);
+        logBand.setStyle("-fx-background-color: " + RED + ";");
+
+        logList.setPadding(new Insets(4, 26, 10, 26));
 
         logScroll = new ScrollPane(logList);
+        logScroll.getStyleClass().add("log-scroll");
         logScroll.setFitToWidth(true);
-        logScroll.setPrefHeight(420);
-        logScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        logScroll.setPrefHeight(430);
+        logScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        VBox.setVgrow(logScroll, Priority.ALWAYS);
 
-        VBox logContent = new VBox(logHeading, logScroll);
-        logContent.setPadding(new Insets(26, 30, 26, 30));
-        logContent.setMaxWidth(760);
-        logContent.setStyle("-fx-background-color: " + PAPER + ";"
+        logHint.setText(spaced(Lang.t("ui.escClose")));
+        logHint.setFont(label(9));
+        logHint.setTextFill(Color.web(GRAY));
+        logHint.setPadding(new Insets(10, 26, 16, 26));
+
+        VBox logSheet = new VBox(logBand, logScroll, logHint);
+        logSheet.setMaxSize(820, 560);
+        logSheet.setMinHeight(Region.USE_PREF_SIZE);
+        logSheet.setStyle("-fx-background-color: " + PAPER + ";"
                 + "-fx-border-color: " + INK + ";"
                 + "-fx-border-width: 2;");
 
-        logCard = new StackPane(logContent);
-        logCard.setStyle("-fx-background-color: rgba(22,22,22,0.86);");
+        logCard = new StackPane(logSheet);
+        logCard.setStyle("-fx-background-color: rgba(22,22,22,0.88);");
         logCard.setVisible(false);
         logCard.setManaged(false);
+        logCard.getStylesheets().add(slimScrollbar());
 
         stagePane.getChildren().addAll(
                 ghostPane,
@@ -1475,10 +1502,13 @@ public class GameUI {
 
         logList.getChildren().clear();
 
+        logCount.setText(entries.size() + " " + Lang.t("ui.logEntries").toUpperCase());
+
         if (entries.isEmpty()) {
             Label empty = new Label(Lang.t("ui.logEmpty"));
             empty.setFont(bodyItalic(15));
             empty.setTextFill(Color.web(GRAY));
+            empty.setPadding(new Insets(18, 0, 0, 0));
             logList.getChildren().add(empty);
         }
 
@@ -1488,72 +1518,140 @@ public class GameUI {
 
             if (e.chapter() != null && e.chapter() != chapter) {
                 chapter = e.chapter();
-
-                Label mark = new Label((chapter == 0
-                        ? Lang.t("ui.prologue")
-                        : Lang.t("ui.chapter") + " " + chapter).toUpperCase());
-                mark.setFont(label(10));
-                mark.setTextFill(Color.web(RED));
-                VBox.setMargin(mark, new Insets(14, 0, 0, 0));
-                logList.getChildren().add(mark);
+                logList.getChildren().add(logDivider(chapter));
             }
 
             logList.getChildren().add("choice".equals(e.kind()) ? logChoice(e) : logLine(e));
         }
 
-        logCard.setVisible(true);
-        logCard.setManaged(true);
+        if (!logCard.isVisible()) {
+            setShown(logCard, true);
+            logCard.setOpacity(0);
+            logCard.setTranslateY(10);
 
-        // the latest line is the one the player wants to see
+            FadeTransition fade = new FadeTransition(Duration.millis(260), logCard);
+            fade.setToValue(1);
+
+            TranslateTransition rise = new TranslateTransition(Duration.millis(260), logCard);
+            rise.setToY(0);
+
+            new ParallelTransition(fade, rise).play();
+        }
+
+        // the latest line is the one the player came for
         javafx.application.Platform.runLater(() -> logScroll.setVvalue(1.0));
     }
 
-    private Node logLine(Chatlog.Entry e) {
+    /** A chapter's name, with a hairline running out to the edge of the sheet. */
+    private Node logDivider(int chapter) {
 
-        VBox box = new VBox(2);
+        Label mark = new Label(spaced(chapter == 0
+                ? Lang.t("ui.prologue").toUpperCase()
+                : (Lang.magyar()
+                        ? chapter + ". " + Lang.t("ui.chapter").toUpperCase()
+                        : Lang.t("ui.chapter").toUpperCase() + " " + chapter)));
+        mark.setFont(label(10));
+        mark.setTextFill(Color.web(RED));
+
+        Region line = new Region();
+        line.setMinHeight(1);
+        line.setPrefHeight(1);
+        line.setMaxHeight(1);
+        line.setStyle("-fx-background-color: " + TRACK + ";");
+        HBox.setHgrow(line, Priority.ALWAYS);
+
+        HBox row = new HBox(12, mark, line);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(22, 0, 10, 0));
+
+        return row;
+    }
+
+    /** A line that was said. Narration has no speaker, so it keeps its italics. */
+    private Node logLine(Chatlog.Entry e) {
 
         boolean narration = e.speaker() == null || e.speaker().isBlank();
 
+        Label text = new Label(e.text());
+        text.setFont(narration ? bodyItalic(15) : body(15));
+        text.setTextFill(Color.web(narration ? GRAY : INK));
+        text.setWrapText(true);
+
+        VBox box = new VBox(2);
+        box.setPadding(new Insets(7, 0, 7, narration ? 14 : 0));
+
         if (!narration) {
-            Label who = new Label(e.speaker().toUpperCase());
-            who.setFont(label(10));
+            Label who = new Label(spaced(e.speaker().toUpperCase()));
+            who.setFont(label(9));
             who.setTextFill(Color.web(GRAY));
             box.getChildren().add(who);
         }
 
-        Label text = new Label(e.text());
-        text.setFont(narration ? bodyItalic(15) : body(15));
-        text.setTextFill(Color.web(INK));
-        text.setWrapText(true);
         box.getChildren().add(text);
 
         return box;
     }
 
+    /** A decision, laid out exactly as the chapter summary lays one out. */
     private Node logChoice(Chatlog.Entry e) {
 
-        Label question = new Label(Lang.t("ui.decision").toUpperCase() + " · " + e.speaker());
-        question.setFont(label(10));
-        question.setTextFill(Color.web(RED));
+        Label question = new Label(e.speaker());
+        question.setFont(label(12));
+        question.setTextFill(Color.web(GRAY));
+        question.setWrapText(true);
+
+        Label answer = new Label(e.text());
+        answer.setFont(Font.font(body(16).getFamily(), FontWeight.BOLD, 16));
+        answer.setTextFill(Color.web(INK));
+        answer.setWrapText(true);
 
         String xp = e.xp() == null || e.xp() == 0 ? "" : (e.xp() > 0 ? "+" : "") + e.xp() + " XP";
         String lebukas = e.lebukas() == null || e.lebukas() == 0
                 ? ""
                 : (e.lebukas() > 0 ? "+" : "") + e.lebukas();
 
-        String points = xp.isEmpty() || lebukas.isEmpty() ? xp + lebukas : xp + " · " + lebukas;
+        Label points = new Label(xp.isEmpty() || lebukas.isEmpty() ? xp + lebukas : xp + " · " + lebukas);
+        points.setFont(Font.font(body(14).getFamily(), FontWeight.BOLD, 14));
+        points.setTextFill(Color.web(RED));
+        points.setMinWidth(Region.USE_PREF_SIZE);
 
-        Label answer = new Label(e.text() + (points.isEmpty() ? "" : "   " + points));
-        answer.setFont(body(15));
-        answer.setTextFill(Color.web(INK));
-        answer.setWrapText(true);
+        VBox left = new VBox(2, question, answer);
 
-        VBox box = new VBox(2, question, answer);
-        box.setPadding(new Insets(0, 0, 0, 12));
-        box.setStyle("-fx-border-color: transparent transparent transparent " + RED + ";"
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox row = new HBox(12, left, spacer, points);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(12, 14, 12, 14));
+        row.setStyle("-fx-background-color: " + PAGE + ";"
+                + "-fx-border-color: transparent transparent transparent " + RED + ";"
                 + "-fx-border-width: 0 0 0 3;");
 
+        VBox box = new VBox(row);
+        box.setPadding(new Insets(6, 0, 6, 0));
+
         return box;
+    }
+
+    /**
+     * A 6px scrollbar in the accent, instead of the platform's grey slab. Inline
+     * styles cannot reach a ScrollPane's inner parts, so this goes in as the
+     * card's own stylesheet - base64, because a stylesheet is loaded by URL.
+     */
+    private static String slimScrollbar() {
+
+        String css = """
+                .log-scroll, .log-scroll > .viewport { -fx-background-color: transparent; -fx-background: transparent; }
+                .log-scroll { -fx-padding: 0; }
+                .log-scroll .scroll-bar:vertical { -fx-background-color: transparent; -fx-pref-width: 6; -fx-padding: 0 4 0 0; }
+                .log-scroll .scroll-bar:vertical .track { -fx-background-color: rgb(230,223,208); -fx-background-radius: 0; -fx-border-color: transparent; }
+                .log-scroll .scroll-bar:vertical .thumb { -fx-background-color: rgb(200,16,46); -fx-background-radius: 0; }
+                .log-scroll .scroll-bar .increment-button, .log-scroll .scroll-bar .decrement-button { -fx-pref-height: 0; -fx-padding: 0; }
+                .log-scroll .scroll-bar .increment-arrow, .log-scroll .scroll-bar .decrement-arrow { -fx-padding: 0; -fx-shape: ""; }
+                """;
+
+        return "data:text/css;base64,"
+                + java.util.Base64.getEncoder().encodeToString(css.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     public void hideLog() {
@@ -2471,6 +2569,8 @@ public class GameUI {
 
         restartButton.setText(Lang.t("ui.restart"));
         logButton.setText(Lang.t("ui.log"));
+        logKicker.setText(spaced(Lang.t("ui.log").toUpperCase()));
+        logHint.setText(spaced(Lang.t("ui.escClose")));
         controlsHint.setText(spaced(Lang.t("ui.controls").toUpperCase()));
         xpName.setText(Lang.t("ui.xp").toUpperCase());
         exposureName.setText(Lang.t("ui.exposure").toUpperCase());

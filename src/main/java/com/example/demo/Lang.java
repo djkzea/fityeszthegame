@@ -125,6 +125,12 @@ public final class Lang {
         p("ui.logEmpty",         "Még nem hangzott el semmi.", "Nothing has been said yet.");
         p("ui.decision",         "Döntés", "Decision");
         p("ui.back",             "Vissza", "Back");
+        p("ui.account",          "Fiók", "Account");
+        p("ui.accountWhy",       "A futásod a fiókodban is megmarad, és a weboldalon is folytathatod.",
+                                 "Your run is kept in your account, and you can carry on with it on the website.");
+        p("ui.escBack",          "ESC VISSZA", "ESC GOES BACK");
+        p("ui.escClose",         "ESC BEZÁR", "ESC CLOSES");
+        p("ui.logEntries",       "bejegyzés", "entries");
         p("ui.logIn",            "Bejelentkezés", "Log In");
         p("ui.signUp",           "Regisztráció", "Sign Up");
         p("ui.email",            "Email", "Email");
