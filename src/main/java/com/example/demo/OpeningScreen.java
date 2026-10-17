@@ -79,12 +79,22 @@ public class OpeningScreen {
     private final StackPane root = new StackPane();
     private final StackPane splash = new StackPane();
 
-    private final Runnable onNewGame;
+    private final java.util.function.IntConsumer onNewGame;
     private final Runnable onExit;
     private final Runnable onSignIn;
-    private final java.util.function.Consumer<SaveData> onContinue;
+    private final java.util.function.Consumer<Run> onContinue;
     private final Account account;
     private final SaveStore saves;
+
+    /** What the menu column is showing: the menu itself, or a slot to start in / load from. */
+    private enum Mode { MENU, NEW, LOAD }
+
+    private Mode mode = Mode.MENU;
+
+    /** The slot whose overwrite is waiting for a second press. */
+    private int confirming = 0;
+
+    private java.util.Map<Integer, SaveData> runs = java.util.Map.of();
 
     private boolean splashDone = false;
     private boolean starting = false;
@@ -106,8 +116,11 @@ public class OpeningScreen {
             () -> clamp(root.getHeight() / DESIGN_H, 0.75, 1.6),
             root.heightProperty());
 
-    public OpeningScreen(Runnable onNewGame, Runnable onExit, Runnable onSignIn,
-                         java.util.function.Consumer<SaveData> onContinue,
+    /** A run and the slot it lives in. */
+    public record Run(int slot, SaveData save) { }
+
+    public OpeningScreen(java.util.function.IntConsumer onNewGame, Runnable onExit, Runnable onSignIn,
+                         java.util.function.Consumer<Run> onContinue,
                          Account account, SaveStore saves) {
 
         this.onNewGame = onNewGame;
@@ -116,6 +129,8 @@ public class OpeningScreen {
         this.onContinue = onContinue;
         this.account = account;
         this.saves = saves;
+
+        loadRuns();
 
         loadFont("Antonio-Bold.ttf");
         loadFont("PublicSans-Regular.ttf");
@@ -278,43 +293,11 @@ public class OpeningScreen {
 
         VBox menu = new VBox();
 
-        SaveData save = latestSave();
-
-        String who = account == null
-                ? null
-                : account.session().map(Account.Session::displayName).orElse(null);
-
-        Button signIn = menuButton(
-                who == null || who.isBlank() ? Lang.t("ui.logIn") : who,
-                true,
-                who == null
-                        ? onSignIn
-                        : () -> {
-                            account.signOut();
-                            rebuild();
-                        });
-
-        Button newGame  = menuButton(Lang.t("ui.newGame"),  true, this::startNewGame);
-        Button loadGame = menuButton(Lang.t("ui.loadGame"), save != null,
-                save == null ? null : () -> onContinue.accept(save));
-        Button exit     = menuButton(Lang.t("ui.exit"),     true, onExit);
-
-        menu.getChildren().addAll(
-                menuRow(signIn, who == null ? null : Lang.t("ui.signOut").toUpperCase()),
-                menuRow(newGame, null),
-                menuRow(loadGame, save == null
-                        ? Lang.t("ui.noSave").toUpperCase()
-                        : saveNote(save)),
-                menuRow(exit, null));
-
-        nav.add(signIn);
-        nav.add(newGame);
-
-        if (save != null) {
-            nav.add(loadGame);
+        if (mode == Mode.MENU) {
+            buildMenu(menu);
+        } else {
+            buildSlots(menu);
         }
-
-        nav.add(exit);
 
         Label hint = new Label(spaced(Lang.magyar()
                 ? "↑↓ VÁLASSZ · ENTER INDÍT · ESC KILÉP"
@@ -349,6 +332,11 @@ public class OpeningScreen {
 
     /** One menu line: the button fills the row, an optional note sits at the far right. */
     private Node menuRow(Button button, String note) {
+        return menuRow(button, note, false);
+    }
+
+    /** The note at the far right; a warning wears the accent instead of grey. */
+    private Node menuRow(Button button, String note, boolean warning) {
 
         HBox row = new HBox();
         row.setAlignment(Pos.CENTER_LEFT);
@@ -362,7 +350,7 @@ public class OpeningScreen {
         if (note != null) {
             Label n = new Label(note);
             n.setFont(Font.font(labelFont, 9));
-            n.setStyle("-fx-text-fill: " + GRAY + ";");
+            n.setStyle("-fx-text-fill: " + (warning ? RED : GRAY) + ";");
             n.setPadding(new Insets(0, 2, 0, 0));
             row.getChildren().add(n);
         }
@@ -504,38 +492,192 @@ public class OpeningScreen {
         }
     }
 
-    /** The run to offer: the fresher of this machine's and the account's. */
-    private SaveData latestSave() {
+    /** The title menu itself. */
+    private void buildMenu(VBox menu) {
 
-        if (saves == null) {
-            return null;
+        String who = account == null
+                ? null
+                : account.session().map(Account.Session::displayName).orElse(null);
+
+        Button signIn = menuButton(
+                who == null || who.isBlank() ? Lang.t("ui.logIn") : who,
+                true,
+                who == null
+                        ? onSignIn
+                        : () -> {
+                            account.signOut();
+                            runs = java.util.Map.of();
+                            rebuild();
+                        });
+
+        Button newGame = menuButton(Lang.t("ui.newGame"), true, () -> {
+            // with a run already saved, where the new one goes is the player's call
+            if (runs.isEmpty()) {
+                startNewGame(1);
+            } else {
+                mode = Mode.NEW;
+                confirming = 0;
+                rebuild();
+            }
+        });
+
+        Button loadGame = menuButton(Lang.t("ui.loadGame"), !runs.isEmpty(),
+                runs.isEmpty() ? null : () -> {
+                    mode = Mode.LOAD;
+                    confirming = 0;
+                    rebuild();
+                });
+
+        Button exit = menuButton(Lang.t("ui.exit"), true, onExit);
+
+        menu.getChildren().addAll(
+                menuRow(signIn, who == null ? null : Lang.t("ui.signOut").toUpperCase()),
+                menuRow(newGame, null),
+                menuRow(loadGame, runs.isEmpty()
+                        ? Lang.t("ui.noSave").toUpperCase()
+                        : (runs.size() + " " + Lang.t("ui.saves")).toUpperCase()),
+                menuRow(exit, null));
+
+        nav.add(signIn);
+        nav.add(newGame);
+
+        if (!runs.isEmpty()) {
+            nav.add(loadGame);
         }
 
-        SaveData local = saves.loadLocal().orElse(null);
-
-        SaveData cloud = account == null
-                ? null
-                : account.session()
-                        .flatMap(session -> saves.fetchCloud(session.accessToken()))
-                        .orElse(null);
-
-        return SaveStore.newer(local, cloud);
+        nav.add(exit);
     }
 
-    /** "3. FEJEZET · A FIÓKODBÓL" - what the LOAD GAME row says on its right. */
-    private String saveNote(SaveData save) {
+    /**
+     * The three slots.
+     *
+     * Starting a new run never writes over another one by accident: an occupied
+     * slot asks first, and the second press is the answer. Keeping runs apart is
+     * also what makes two of them comparable afterwards.
+     */
+    private void buildSlots(VBox menu) {
 
-        String chapter = save.chapter() == 0
+        Label heading = new Label(spaced(
+                (mode == Mode.NEW ? Lang.t("ui.chooseSlot") : Lang.t("ui.whichRun")).toUpperCase()));
+        heading.setFont(Font.font(labelFont, 10));
+        heading.setStyle("-fx-text-fill: " + RED + ";");
+        VBox.setMargin(heading, new Insets(0, 0, 12, 3));
+
+        menu.getChildren().add(heading);
+
+        for (int i = 1; i <= SaveStore.SLOTS; i++) {
+
+            final int slot = i;
+            SaveData run = runs.get(slot);
+
+            boolean usable = mode == Mode.NEW || run != null;
+
+            String name = run == null
+                    ? Lang.t("ui.slotEmpty")
+                    : (run.playerName() == null || run.playerName().isBlank()
+                            ? Lang.t("ui.guest") : run.playerName());
+
+            String note = confirming == slot
+                    ? Lang.t("ui.overwriteAsk").toUpperCase()
+                    : (run == null ? null : runNote(run));
+
+            Button row = menuButton(slot + " · " + name, usable, usable ? () -> choose(slot) : null);
+
+            menu.getChildren().add(menuRow(row, note, confirming == slot));
+
+            if (usable) {
+                nav.add(row);
+            }
+        }
+
+        Button back = menuButton(Lang.t("ui.back"), true, () -> {
+            mode = Mode.MENU;
+            confirming = 0;
+            rebuild();
+        });
+
+        menu.getChildren().add(menuRow(back, null));
+        nav.add(back);
+    }
+
+    /** A slot was picked: load it, start in it, or ask before writing over it. */
+    private void choose(int slot) {
+
+        SaveData run = runs.get(slot);
+
+        if (mode == Mode.LOAD) {
+            onContinue.accept(new Run(slot, run));
+            return;
+        }
+
+        if (run != null && confirming != slot) {
+            confirming = slot;      // the second press is the answer
+            rebuild();
+            return;
+        }
+
+        startNewGame(slot);
+    }
+
+    /** "2. FEJEZET · 10.17 21:13" */
+    private String runNote(SaveData run) {
+
+        String chapter = run.chapter() == 0
                 ? Lang.t("ui.prologue")
                 : (Lang.magyar()
-                        ? save.chapter() + ". " + Lang.t("ui.chapter")
-                        : Lang.t("ui.chapter") + " " + save.chapter());
+                        ? run.chapter() + ". " + Lang.t("ui.chapter")
+                        : Lang.t("ui.chapter") + " " + run.chapter());
 
-        String from = save.scene() == null || save.scene().isBlank()
-                ? Lang.t("ui.saveFromCloud")
-                : Lang.t("ui.saveFromLocal");
+        String when = "";
 
-        return (chapter + " · " + from).toUpperCase();
+        try {
+            when = " · " + java.time.LocalDateTime.ofInstant(
+                            java.time.Instant.parse(run.updatedAt()), java.time.ZoneId.systemDefault())
+                    .format(java.time.format.DateTimeFormatter.ofPattern("MM.dd HH:mm"));
+        } catch (RuntimeException ignored) {
+            // a save with no readable time still shows its chapter
+        }
+
+        return (chapter + when).toUpperCase();
+    }
+
+    /**
+     * The runs, this machine's first and the account's folded in behind.
+     *
+     * The local files are read on the spot; the account costs a request, so it
+     * happens off the JavaFX thread and the column is rebuilt when it lands.
+     */
+    private void loadRuns() {
+
+        if (saves == null) {
+            return;
+        }
+
+        runs = saves.runs(null);
+
+        String token = account == null
+                ? null
+                : account.session().map(Account.Session::accessToken).orElse(null);
+
+        if (token == null) {
+            return;
+        }
+
+        Thread worker = new Thread(() -> {
+
+            java.util.Map<Integer, SaveData> merged = saves.runs(token);
+
+            javafx.application.Platform.runLater(() -> {
+                runs = merged;
+
+                if (mode == Mode.MENU) {
+                    rebuild();
+                }
+            });
+        }, "fityesz-runs");
+
+        worker.setDaemon(true);
+        worker.start();
     }
 
     // ==========================================
@@ -692,7 +834,7 @@ public class OpeningScreen {
     // NEW GAME
     // ==========================================
 
-    private void startNewGame() {
+    private void startNewGame(int slot) {
 
         if (starting) {
             return;
@@ -701,7 +843,7 @@ public class OpeningScreen {
 
         // the shell drops its curtain over this page; fading it out here as well
         // would just wash the page to nothing first
-        onNewGame.run();
+        onNewGame.accept(slot);
     }
 
     // ==========================================

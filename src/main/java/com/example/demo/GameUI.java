@@ -1647,7 +1647,13 @@ public class GameUI {
         return frame;
     }
 
-    /** The speaker's own face, cropped to the head, for the log's lines. */
+    /**
+     * The speaker's face as a medallion.
+     *
+     * A square crop of a drawing reads as a drawing with its head cut off, so
+     * the window is taken around the head - centred on the eyes, wide enough to
+     * carry the shoulders - and then clipped to a circle with a ring around it.
+     */
     private Node face(String speaker) {
 
         if (speaker == null || speaker.isBlank()) {
@@ -1670,26 +1676,38 @@ public class GameUI {
             return null;
         }
 
-        double side = img.getWidth() * 0.38;
+        double size = 46;
+        double side = img.getWidth() * 0.52;
+
+        // the head sits in the top sixth of these drawings, a little left of centre
+        double x = Math.max(0, img.getWidth() * 0.44 - side / 2);
+        double y = Math.max(0, img.getHeight() * 0.15 - side / 2);
+
+        side = Math.min(side, Math.min(img.getWidth() - x, img.getHeight() - y));
 
         ImageView v = new ImageView(img);
         v.setPreserveRatio(false);
         v.setSmooth(true);
-        v.setFitWidth(44);
-        v.setFitHeight(44);
-        v.setViewport(new javafx.geometry.Rectangle2D(
-                img.getWidth() * 0.26, img.getHeight() * 0.02, side, side));
+        v.setFitWidth(size);
+        v.setFitHeight(size);
+        v.setViewport(new javafx.geometry.Rectangle2D(x, y, side, side));
+        v.setClip(new javafx.scene.shape.Circle(size / 2, size / 2, size / 2));
 
-        StackPane frame = new StackPane(v);
-        frame.setMinSize(46, 46);
-        frame.setMaxSize(46, 46);
-        frame.setStyle("-fx-background-color: " + PAGE + ";"
-                + "-fx-border-color: " + INK + "; -fx-border-width: 1;");
+        javafx.scene.shape.Circle plate = new javafx.scene.shape.Circle(size / 2);
+        plate.setFill(Color.web(PAGE));
+
+        javafx.scene.shape.Circle ring = new javafx.scene.shape.Circle(size / 2 - 0.6);
+        ring.setFill(Color.TRANSPARENT);
+        ring.setStroke(Color.web(INK, 0.85));
+        ring.setStrokeWidth(1.2);
+
+        StackPane frame = new StackPane(plate, v, ring);
+        frame.setMinSize(size, size);
+        frame.setMaxSize(size, size);
 
         return frame;
     }
 
-    /** A line that was said. Narration has no speaker, so it keeps its italics. */
     private Node logLine(Chatlog.Entry e) {
 
         boolean narration = e.speaker() == null || e.speaker().isBlank();

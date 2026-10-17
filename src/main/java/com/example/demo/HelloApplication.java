@@ -117,15 +117,28 @@ public class HelloApplication extends Application {
                 this::enterGame,
                 () -> dip(Platform::exit, 420),
                 this::showLogin,
-                this::enterGame,
+                this::continueGame,
                 controller.account(),
                 controller.saves());
     }
 
-    /** The sign-in screen, and back to a rebuilt title page either way. */
+    /**
+     * A title page that is already there - no wordmark animation.
+     *
+     * The splash belongs to starting the app. Coming back from the game or from
+     * the sign-in screen, it is a wait in front of a page that has been seen.
+     */
+    private OpeningScreen titleNow() {
+
+        OpeningScreen again = title();
+        again.showPosterNow();
+        return again;
+    }
+
+    /** The sign-in screen, and back to a title page that is already up. */
     private void showLogin() {
 
-        Runnable back = () -> dip(() -> shell.getChildren().set(0, title().getRoot()), 420);
+        Runnable back = () -> dip(() -> shell.getChildren().set(0, titleNow().getRoot()), 420);
 
         LoginScreen screen = new LoginScreen(controller.account(), back, back);
 
@@ -298,9 +311,7 @@ public class HelloApplication extends Application {
         dip(() -> {
             inGame = false;
 
-            OpeningScreen again = title();
-            again.showPosterNow();
-            shell.getChildren().set(0, again.getRoot());
+            shell.getChildren().set(0, titleNow().getRoot());
         }, 460);
     }
 
@@ -318,12 +329,18 @@ public class HelloApplication extends Application {
      * Title page pushes in as the curtain falls, the disclaimer plays on the ink,
      * then the game lifts out of it.
      */
-    private void enterGame() {
-        enterGame(null);
+    /** New Game, in the slot the player picked. */
+    private void enterGame(int slot) {
+        enterGame(null, slot);
+    }
+
+    /** Load Game: the run and the slot it goes on living in. */
+    private void continueGame(OpeningScreen.Run run) {
+        enterGame(run.save(), run.slot());
     }
 
     /** The curtain, the card, and then either a fresh run or a saved one. */
-    private void enterGame(SaveData save) {
+    private void enterGame(SaveData save, int slot) {
 
         Node title = shell.getChildren().get(0);
 
@@ -345,9 +362,9 @@ public class HelloApplication extends Application {
 
             // started as the curtain lifts, so the first line is already typing
             if (save == null) {
-                controller.begin();
+                controller.begin(slot);
             } else {
-                controller.resume(save);
+                controller.resume(save, slot);
             }
 
             // once only: the filter stays on the scene for the life of the app

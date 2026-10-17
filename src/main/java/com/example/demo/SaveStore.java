@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * The run on this machine.
+ * The runs on this machine, one per slot.
  *
  * The local file is the real save: it is written synchronously, so a run
  * survives a crash and a plane trip. The cloud half is best effort on top of
@@ -19,19 +19,28 @@ import java.util.Optional;
  */
 public class SaveStore {
 
-    private final Path file;
+    /** Three, because that is what the saves table's own check constraint allows. */
+    public static final int SLOTS = 3;
+
+    private final Path dir;
     private final Supabase sb;
 
-    public SaveStore(Path file) {
-        this(file, null);
+    public SaveStore(Path dir) {
+        this(dir, null);
     }
 
-    public SaveStore(Path file, Supabase sb) {
-        this.file = file;
+    public SaveStore(Path dir, Supabase sb) {
+        this.dir = dir;
         this.sb = sb;
     }
 
-    public void saveLocal(SaveData data) {
+    public Path fileFor(int slot) {
+        return dir.resolve("save-slot" + slot + ".json");
+    }
+
+    public void saveLocal(int slot, SaveData data) {
+
+        Path file = fileFor(slot);
 
         try {
             Path parent = file.getParent();
@@ -54,7 +63,9 @@ public class SaveStore {
         }
     }
 
-    public Optional<SaveData> loadLocal() {
+    public Optional<SaveData> loadLocal(int slot) {
+
+        Path file = fileFor(slot);
 
         if (!Files.isRegularFile(file)) {
             return Optional.empty();
@@ -112,7 +123,7 @@ public class SaveStore {
      * never overwrites the account, because that is what a failed restore looks
      * like, and the first click would otherwise wipe a finished run.
      */
-    public void pushCloud(SaveData data, String userId, String token) {
+    public void pushCloud(int slot, SaveData data, String userId, String token) {
 
         if (sb == null || token == null || userId == null) {
             return;
@@ -124,7 +135,7 @@ public class SaveStore {
 
         try {
             Transport.Res res = sb.call("POST", "/rest/v1/saves?on_conflict=user_id,slot",
-                    rowOf(data, userId), token,
+                    rowOf(data, userId, slot), token,
                     java.util.Map.of("Prefer", "resolution=merge-duplicates,return=minimal"));
 
             if (!res.ok()) {
@@ -136,39 +147,72 @@ public class SaveStore {
         }
     }
 
-    /** The account's run, if there is one. */
-    public Optional<SaveData> fetchCloud(String token) {
+    /**
+     * Every run the account holds, by slot.
+     *
+     * One request for all three: the title screen needs them together, and row
+     * level security already limits the answer to this player's own rows.
+     */
+    public java.util.Map<Integer, SaveData> fetchCloud(String token) {
+
+        java.util.Map<Integer, SaveData> runs = new java.util.LinkedHashMap<>();
 
         if (sb == null || token == null) {
-            return Optional.empty();
+            return runs;
         }
 
         try {
-            Transport.Res res = sb.call("GET",
-                    "/rest/v1/saves?slot=eq.1&select=" + COLUMNS, null, token);
+            Transport.Res res = sb.call("GET", "/rest/v1/saves?select=slot," + COLUMNS, null, token);
 
             if (!res.ok()) {
                 System.err.println("save: felho " + res.status());
-                return Optional.empty();
+                return runs;
             }
 
-            SaveData[] rows = Json.mapper().readValue(res.body(), SaveData[].class);
+            for (com.fasterxml.jackson.databind.JsonNode row : Json.mapper().readTree(res.body())) {
 
-            return rows.length == 0 ? Optional.empty() : Optional.of(rows[0]);
+                int slot = row.path("slot").asInt(1);
+
+                if (slot >= 1 && slot <= SLOTS) {
+                    runs.put(slot, Json.mapper().treeToValue(row, SaveData.class));
+                }
+            }
 
         } catch (IOException e) {
             System.err.println("save: " + e.getMessage());
-            return Optional.empty();
         }
+
+        return runs;
+    }
+
+    /**
+     * What every slot holds, this machine and the account taken together, the
+     * fresher of the two winning. A slot with no run at all is left out.
+     */
+    public java.util.Map<Integer, SaveData> runs(String token) {
+
+        java.util.Map<Integer, SaveData> cloud = fetchCloud(token);
+        java.util.Map<Integer, SaveData> all = new java.util.LinkedHashMap<>();
+
+        for (int slot = 1; slot <= SLOTS; slot++) {
+
+            SaveData run = newer(loadLocal(slot).orElse(null), cloud.get(slot));
+
+            if (run != null) {
+                all.put(slot, run);
+            }
+        }
+
+        return all;
     }
 
     /** The upsert's body: the run plus the two columns that belong to the row. */
-    String rowOf(SaveData data, String userId) throws IOException {
+    String rowOf(SaveData data, String userId, int slot) throws IOException {
 
         com.fasterxml.jackson.databind.node.ObjectNode row = Json.mapper().valueToTree(data);
 
         row.put("user_id", userId);
-        row.put("slot", 1);
+        row.put("slot", slot);
 
         return Json.mapper().writeValueAsString(Json.mapper().createArrayNode().add(row));
     }

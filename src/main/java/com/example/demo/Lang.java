@@ -125,6 +125,11 @@ public final class Lang {
         p("ui.logEmpty",         "Még nem hangzott el semmi.", "Nothing has been said yet.");
         p("ui.decision",         "Döntés", "Decision");
         p("ui.back",             "Vissza", "Back");
+        p("ui.saves",            "mentés", "saves");
+        p("ui.slotEmpty",        "Üres hely", "Empty slot");
+        p("ui.chooseSlot",       "Hova kerüljön az új futás?", "Where should the new run go?");
+        p("ui.whichRun",         "Melyiket folytatod?", "Which run do you continue?");
+        p("ui.overwriteAsk",     "Felülírod? Nyomd meg újra", "Overwrite? Press again");
         p("ui.account",          "Fiók", "Account");
         p("ui.accountWhy",       "A futásod a fiókodban is megmarad, és a weboldalon is folytathatod.",
                                  "Your run is kept in your account, and you can carry on with it on the website.");

@@ -67,8 +67,11 @@ public class GameController {
             .orElse(null);
 
     private final SaveStore saves = new SaveStore(
-            AppDirs.data().resolve("save-slot1.json"),
+            AppDirs.data(),
             Supabase.configured().orElse(null));
+
+    /** Which of the three slots this run belongs to. */
+    private int slot = 1;
 
     /** One thread for the account writes, so a slow server never holds up a click. */
     private final java.util.concurrent.ExecutorService network =
@@ -106,6 +109,11 @@ public class GameController {
      * Entered from the title screen's New Game. The language is picked there now,
      * and the UI was built before that choice, so refresh its labels first.
      */
+    public void begin(int slot) {
+        this.slot = slot;
+        begin();
+    }
+
     public void begin() {
         ui.updateLanguage();
         // full reset, so coming back out to the menu and starting again is a clean run
@@ -175,7 +183,7 @@ public class GameController {
         // Nothing has happened until the player has a name, and a save of the
         // name prompt would offer itself on the title screen as a run to continue.
         if (saving && state.getName() != null && !state.getName().isBlank()) {
-            saves.saveLocal(snapshot());
+            saves.saveLocal(slot, snapshot());
         }
     }
 
@@ -213,6 +221,11 @@ public class GameController {
      * scene is where it picks up. An unknown scene name - a method renamed
      * since the save was written - does the same rather than failing.
      */
+    public void resume(SaveData data, int slot) {
+        this.slot = slot;
+        resume(data);
+    }
+
     public void resume(SaveData data) {
 
         ui.updateLanguage();
@@ -318,14 +331,14 @@ public class GameController {
 
         SaveData data = snapshot();
 
-        saves.saveLocal(data);
+        saves.saveLocal(slot, data);
 
         if (!toCloud || account == null) {
             return;
         }
 
         account.session().ifPresent(session ->
-                network.submit(() -> saves.pushCloud(data, session.userId(), session.accessToken())));
+                network.submit(() -> saves.pushCloud(slot, data, session.userId(), session.accessToken())));
     }
 
     /** The signed-in player, if there is one. */

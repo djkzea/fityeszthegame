@@ -143,7 +143,7 @@ class ResumeSmokeTest {
 
         assertTrue(Files.isRegularFile(file), "a mentes nem jott letre: " + file);
 
-        SaveData onDisk = new SaveStore(file).loadLocal().orElseThrow();
+        SaveData onDisk = new SaveStore(AppDirs.data()).loadLocal(1).orElseThrow();
         assertNotEquals("lipotiOffer", onDisk.scene(), "a jelenet nem lepett tovabb");
         assertEquals("Zsombi", onDisk.playerName());
         assertTrue(onDisk.log().size() > 1, "a naplo nem nott a kattintassal");

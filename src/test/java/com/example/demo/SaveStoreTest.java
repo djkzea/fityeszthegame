@@ -23,43 +23,42 @@ class SaveStoreTest {
 
     @Test
     void whatWasSavedIsWhatComesBack(@TempDir Path dir) {
-        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"));
+        SaveStore store = new SaveStore(dir);
         SaveData d = run(2, "lakatosRules", "2026-10-17T18:00:00Z");
 
-        store.saveLocal(d);
+        store.saveLocal(1, d);
 
-        assertEquals(Optional.of(d), store.loadLocal());
+        assertEquals(Optional.of(d), store.loadLocal(1));
     }
 
     @Test
     void noFileMeansNoSaveRatherThanAnError(@TempDir Path dir) {
-        assertTrue(new SaveStore(dir.resolve("nincs.json")).loadLocal().isEmpty());
+        assertTrue(new SaveStore(dir.resolve("ures")).loadLocal(1).isEmpty());
     }
 
     @Test
     void aDamagedFileReadsAsNoSave(@TempDir Path dir) throws IOException {
-        Path file = dir.resolve("save-slot1.json");
-        Files.writeString(file, "{ ez nem json");
-        assertTrue(new SaveStore(file).loadLocal().isEmpty());
+        Files.writeString(dir.resolve("save-slot1.json"), "{ ez nem json");
+        assertTrue(new SaveStore(dir).loadLocal(1).isEmpty());
     }
 
     @Test
     void savingTwiceLeavesNoTemporaryFileBehind(@TempDir Path dir) throws IOException {
-        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"));
-        store.saveLocal(run(1, "chapter1", "2026-10-17T18:00:00Z"));
-        store.saveLocal(run(2, "chapter2", "2026-10-17T18:05:00Z"));
+        SaveStore store = new SaveStore(dir);
+        store.saveLocal(1, run(1, "chapter1", "2026-10-17T18:00:00Z"));
+        store.saveLocal(1, run(2, "chapter2", "2026-10-17T18:05:00Z"));
 
         try (var files = Files.list(dir)) {
             assertEquals(List.of("save-slot1.json"), files.map(p -> p.getFileName().toString()).toList());
         }
-        assertEquals(2, store.loadLocal().orElseThrow().chapter());
+        assertEquals(2, store.loadLocal(1).orElseThrow().chapter());
     }
 
     @Test
     void theDirectoryIsCreatedIfItIsNotThereYet(@TempDir Path dir) {
-        Path file = dir.resolve("meg").resolve("nincs").resolve("save-slot1.json");
-        new SaveStore(file).saveLocal(run(1, "chapter1", "2026-10-17T18:00:00Z"));
-        assertTrue(Files.exists(file));
+        SaveStore store = new SaveStore(dir.resolve("meg").resolve("nincs"));
+        store.saveLocal(1, run(1, "chapter1", "2026-10-17T18:00:00Z"));
+        assertTrue(Files.exists(store.fileFor(1)));
     }
 
     @Test
@@ -89,6 +88,39 @@ class SaveStoreTest {
         assertEquals(good, SaveStore.newer(good, broken));
     }
 
+    @Test
+    void eachSlotKeepsItsOwnRun(@TempDir Path dir) {
+
+        SaveStore store = new SaveStore(dir);
+
+        store.saveLocal(1, run(1, "chapter1", "2026-10-17T18:00:00Z"));
+        store.saveLocal(3, run(5, "chapter5", "2026-10-17T19:00:00Z"));
+
+        assertEquals(1, store.loadLocal(1).orElseThrow().chapter());
+        assertTrue(store.loadLocal(2).isEmpty());
+        assertEquals(5, store.loadLocal(3).orElseThrow().chapter());
+
+        assertEquals(java.util.Set.of(1, 3), store.runs(null).keySet());
+    }
+
+    @Test
+    void theCloudRunsComeBackUnderTheirOwnSlots(@TempDir Path dir) {
+
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200,
+                "[{\"slot\":2,\"player_name\":\"Zsombi\",\"chapter\":4,\"updated_at\":\"2026-10-17T19:00:00Z\"},"
+                        + "{\"slot\":3,\"player_name\":\"Anna\",\"chapter\":1,\"updated_at\":\"2026-10-17T18:00:00Z\"}]"));
+
+        SaveStore store = new SaveStore(dir,
+                new Supabase("https://p.supabase.co", "anon-key", t));
+
+        java.util.Map<Integer, SaveData> runs = store.fetchCloud("acc1");
+
+        assertEquals(java.util.Set.of(2, 3), runs.keySet());
+        assertEquals("Anna", runs.get(3).playerName());
+        assertTrue(t.calls.get(0).url().contains("select=slot,"), t.calls.get(0).url());
+    }
+
     /** A transport that records what was asked and answers from a list. */
     private static final class FakeTransport implements Transport {
 
@@ -109,10 +141,10 @@ class SaveStoreTest {
         FakeTransport t = new FakeTransport();
         t.answers.add(new Transport.Res(201, ""));
 
-        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
+        SaveStore store = new SaveStore(dir,
                 new Supabase("https://p.supabase.co", "anon-key", t));
 
-        store.pushCloud(run(3, "lakatosRules", "2026-10-17T18:00:00Z"), "u-1", "acc1");
+        store.pushCloud(1, run(3, "lakatosRules", "2026-10-17T18:00:00Z"), "u-1", "acc1");
 
         FakeTransport.Call call = t.calls.get(0);
         assertEquals("POST", call.method());
@@ -126,30 +158,11 @@ class SaveStoreTest {
     }
 
     @Test
-    void theCloudRunComesBackFromTheFirstRow(@TempDir Path dir) {
-        FakeTransport t = new FakeTransport();
-        t.answers.add(new Transport.Res(200,
-                "[{\"player_name\":\"Zsombi\",\"chapter\":4,\"xp\":80,\"lebukas\":20,\"szint\":2,"
-                        + "\"items\":[\"envelope1\"],\"history\":[],\"log\":[],"
-                        + "\"updated_at\":\"2026-10-17T19:00:00Z\"}]"));
-
-        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
-                new Supabase("https://p.supabase.co", "anon-key", t));
-
-        SaveData d = store.fetchCloud("acc1").orElseThrow();
-
-        assertEquals(4, d.chapter());
-        assertEquals("Zsombi", d.playerName());
-        assertTrue(t.calls.get(0).url().contains("slot=eq.1"));
-        assertEquals("GET", t.calls.get(0).method());
-    }
-
-    @Test
     void anEmptyCloudAnswerIsNoSave(@TempDir Path dir) {
         FakeTransport t = new FakeTransport();
         t.answers.add(new Transport.Res(200, "[]"));
 
-        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
+        SaveStore store = new SaveStore(dir,
                 new Supabase("https://p.supabase.co", "anon-key", t));
 
         assertTrue(store.fetchCloud("acc1").isEmpty());
@@ -160,17 +173,17 @@ class SaveStoreTest {
         FakeTransport t = new FakeTransport();
         t.answers.add(new Transport.Res(503, "down"));
 
-        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
+        SaveStore store = new SaveStore(dir,
                 new Supabase("https://p.supabase.co", "anon-key", t));
 
         assertTrue(store.fetchCloud("acc1").isEmpty());
-        store.pushCloud(run(1, "chapter1", "2026-10-17T18:00:00Z"), "u-1", "acc1");
+        store.pushCloud(1, run(1, "chapter1", "2026-10-17T18:00:00Z"), "u-1", "acc1");
     }
 
     @Test
     void withoutAProjectNothingIsPushed(@TempDir Path dir) {
-        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"), null);
-        store.pushCloud(run(1, "chapter1", "2026-10-17T18:00:00Z"), "u-1", "acc1");
+        SaveStore store = new SaveStore(dir, null);
+        store.pushCloud(1, run(1, "chapter1", "2026-10-17T18:00:00Z"), "u-1", "acc1");
         assertTrue(store.fetchCloud("acc1").isEmpty());
     }
 
@@ -178,13 +191,13 @@ class SaveStoreTest {
     void aRunWithNoDecisionsNeverOverwritesTheAccount(@TempDir Path dir) {
         FakeTransport t = new FakeTransport();
 
-        SaveStore store = new SaveStore(dir.resolve("save-slot1.json"),
+        SaveStore store = new SaveStore(dir,
                 new Supabase("https://p.supabase.co", "anon-key", t));
 
         SaveData blank = new SaveData("Zsombi", "Zsombi", 1, "chapter1", 0, 0, 1,
                 List.of(), List.of(), List.of(), null, null, "2026-10-17T18:00:00Z");
 
-        store.pushCloud(blank, "u-1", "acc1");
+        store.pushCloud(1, blank, "u-1", "acc1");
 
         assertEquals(List.of(), t.calls);
     }
