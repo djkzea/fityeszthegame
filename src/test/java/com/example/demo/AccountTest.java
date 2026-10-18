@@ -248,9 +248,56 @@ class AccountTest {
     }
 
     @Test
-    void signingOutGoesBackToTheGuestRatherThanNobody(@TempDir Path dir) throws Exception {
+    void signingInToAnExistingAccountTakesTheGuestAwayWithIt(@TempDir Path dir) throws Exception {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200, "{\"access_token\":\"guest1\",\"refresh_token\":\"gr1\"}"));
+        t.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":true,\"user_metadata\":{}}"));
+
+        Account account = new Account(
+                new Supabase("https://p.supabase.co", "anon-key", t), dir.resolve("session.json"));
+        account.ensureSession();
+
+        t.answers.add(new Transport.Res(200, TOKENS));
+        t.answers.add(new Transport.Res(200, USER));
+        t.answers.add(new Transport.Res(200, "{\"deleted\":true}"));
+
+        account.signIn("zsombi@pelda.hu", "titkos123");
+
+        FakeTransport.Call cleanup = t.calls.get(t.calls.size() - 1);
+        assertEquals("https://p.supabase.co/functions/v1/delete-account", cleanup.url());
+        assertEquals("Bearer guest1", cleanup.headers().get("Authorization"),
+                "a vendég saját tokenjével kell törölni, nem az új fiókéval");
+
+        assertFalse(Files.exists(dir.resolve("guest.json")));
+    }
+
+    @Test
+    void anUpgradedGuestIsNotDeleted(@TempDir Path dir) throws Exception {
         FakeTransport t = new FakeTransport();
         t.answers.add(new Transport.Res(200, TOKENS));
+        t.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":true,\"user_metadata\":{}}"));
+
+        Account account = new Account(
+                new Supabase("https://p.supabase.co", "anon-key", t), dir.resolve("session.json"));
+        account.ensureSession();
+
+        t.answers.add(new Transport.Res(200, "{\"id\":\"u-guest\",\"email\":\"a@b.hu\"}"));
+        t.answers.add(new Transport.Res(201, ""));
+        t.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":false,\"user_metadata\":{\"display_name\":\"zsombi\"}}"));
+
+        account.signUp("a@b.hu", "zsombi", "titkos123");
+
+        assertTrue(t.calls.stream().noneMatch(c -> c.url().contains("delete-account")),
+                "a felminősített vendég maga a fiók - nem szabad törölni");
+    }
+
+    @Test
+    void signingOutLeavesTheGameSavingAsAGuestAgain(@TempDir Path dir) throws Exception {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200, "{\"access_token\":\"guest1\",\"refresh_token\":\"gr1\"}"));
         t.answers.add(new Transport.Res(200,
                 "{\"id\":\"u-guest\",\"is_anonymous\":true,\"user_metadata\":{}}"));
 
@@ -260,13 +307,20 @@ class AccountTest {
 
         t.answers.add(new Transport.Res(200, TOKENS));
         t.answers.add(new Transport.Res(200, USER));
+        t.answers.add(new Transport.Res(200, "{\"deleted\":true}"));
         account.signIn("zsombi@pelda.hu", "titkos123");
         assertTrue(account.session().orElseThrow().named());
 
+        // the first guest went with the sign-in, so leaving the account makes a new one
+        t.answers.add(new Transport.Res(200, "{\"access_token\":\"guest2\",\"refresh_token\":\"gr2\"}"));
+        t.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest-2\",\"is_anonymous\":true,\"user_metadata\":{}}"));
+
         account.signOut();
 
-        assertEquals("u-guest", account.session().orElseThrow().userId());
-        assertTrue(account.session().orElseThrow().anonymous());
+        Account.Session now = account.session().orElseThrow();
+        assertTrue(now.anonymous(), "kilépés után is kell lennie kinek a nevében menteni");
+        assertEquals("u-guest-2", now.userId());
     }
 
     @Test

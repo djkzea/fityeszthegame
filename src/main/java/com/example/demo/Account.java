@@ -168,6 +168,10 @@ public final class Account {
 
         String id = identifier.trim();
 
+        // who we were a moment ago - a guest left behind by this sign-in has no
+        // further use, and is cleaned up once the new session is in hand
+        Session previous = session;
+
         if (id.contains("@")) {
 
             Transport.Res direct = call("POST", "/auth/v1/token?grant_type=password",
@@ -175,8 +179,10 @@ public final class Account {
 
             if (direct.ok()) {
                 JsonNode tokens = read(direct.body());
-                return finish(tokens.path("access_token").asText(),
+                Session now = finish(tokens.path("access_token").asText(),
                         tokens.path("refresh_token").asText());
+                discardGuest(previous);
+                return now;
             }
 
             throw new AuthException("ui.authFailed");
@@ -195,7 +201,53 @@ public final class Account {
 
         JsonNode tokens = read(res.body());
 
-        return finish(tokens.path("access_token").asText(), tokens.path("refresh_token").asText());
+        Session now = finish(tokens.path("access_token").asText(),
+                tokens.path("refresh_token").asText());
+
+        discardGuest(previous);
+
+        return now;
+    }
+
+    /**
+     * Throws away the guest the player has just walked away from.
+     *
+     * Registering upgrades the guest, so that one lives on as the account. But
+     * signing in to an account that already existed leaves the guest behind
+     * with nobody to claim it, and Supabase cannot merge two users - so it is
+     * deleted, along with the rows that hang off it. The runs are not lost with
+     * it: the local save files are what the account is reconciled against.
+     *
+     * Best effort. A guest that survives is clutter in the project, not a
+     * problem for the player in front of us.
+     */
+    private void discardGuest(Session previous) {
+
+        if (previous == null || !previous.anonymous()) {
+            return;
+        }
+
+        if (session != null && previous.userId().equals(session.userId())) {
+            return;    // the same user, upgraded rather than left behind
+        }
+
+        try {
+            Transport.Res res = sb.call("POST", "/functions/v1/delete-account",
+                    null, previous.accessToken());
+
+            if (!res.ok()) {
+                System.err.println("account: a vendég törlése nem sikerült (" + res.status() + ")");
+            }
+
+        } catch (IOException e) {
+            System.err.println("account: " + e.getMessage());
+        }
+
+        try {
+            Files.deleteIfExists(guestFile);
+        } catch (IOException e) {
+            System.err.println("session: " + e.getMessage());
+        }
     }
 
     /**
