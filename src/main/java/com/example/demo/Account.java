@@ -113,16 +113,20 @@ public final class Account {
     /**
      * Makes sure there is somebody to save as, without asking the player anything.
      *
-     * A fresh install signs in anonymously: the run then goes to the account
-     * row from the first chapter, and the player never saw a login screen. The
-     * identity lives in this machine's guest file until they put an address on
-     * it, which is what turns it into a real account they can also reach from
-     * the website.
+     * The first run worth saving signs in anonymously: the save then goes to an
+     * account row from that moment on, and the player never saw a login screen.
+     * The identity lives in this machine's guest file until they put an address
+     * on it, which is what turns it into a real account they can also reach
+     * from the website.
+     *
+     * Called when there is something to save, not at startup - somebody who
+     * opens the game and closes it again should not leave an empty account
+     * behind. Synchronized, so two saves at once cannot make two guests.
      *
      * Best effort throughout - no project, no network, or anonymous sign-ins
      * turned off on the project all mean the game plays on and saves locally.
      */
-    public Optional<Session> ensureSession() {
+    public synchronized Optional<Session> ensureSession() {
 
         if (restore().isPresent()) {
             return Optional.of(session);

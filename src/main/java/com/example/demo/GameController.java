@@ -99,16 +99,10 @@ public class GameController {
         ui.setOnGameRestart(this::restartGame);
         ui.setOnLog(() -> ui.showLog(chatlog.entries()));
 
-        // The session from last time, or a new guest one - off the JavaFX thread,
-        // because signing in anonymously is a network call and the title screen
-        // must not wait for it. Without it the game simply saves locally.
+        // Only what this machine already remembers. A guest account is made when
+        // there is a run to put in it, not for every launch.
         if (account != null) {
-
             account.restore();
-
-            Thread opening = new Thread(account::ensureSession, "fityesz-session");
-            opening.setDaemon(true);
-            opening.start();
         }
     }
 
@@ -344,8 +338,10 @@ public class GameController {
             return;
         }
 
-        account.session().ifPresent(session ->
-                network.submit(() -> saves.pushCloud(slot, data, session.userId(), session.accessToken())));
+        // The first save is also where a guest account gets made, if the player
+        // has not signed in - off the JavaFX thread, like the upload itself.
+        network.submit(() -> account.ensureSession().ifPresent(session ->
+                saves.pushCloud(slot, data, session.userId(), session.accessToken())));
     }
 
     /** The signed-in player, if there is one. */
