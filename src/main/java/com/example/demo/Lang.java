@@ -117,6 +117,7 @@ public final class Lang {
         p("ui.authOffline",      "Nincs kapcsolat a kiszolgálóval.", "The server cannot be reached.");
         p("ui.authNoUsernames",  "Felhasználónévvel most nem lehet belépni, próbáld az e-mail-címeddel.",
                                  "Signing in by username is unavailable right now - try your e-mail address.");
+        p("ui.nameTaken",        "Ez a felhasználónév már foglalt.", "That username is taken.");
         p("ui.authUnavailable",  "A fiókok ebben a buildben nincsenek beállítva.",
                                  "Accounts are not configured in this build.");
         p("ui.checkEmail",       "Nézd meg a postafiókod, és erősítsd meg az e-mail-címet.",

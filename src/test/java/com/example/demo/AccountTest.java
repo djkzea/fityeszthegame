@@ -157,6 +157,119 @@ class AccountTest {
     }
 
     @Test
+    void afreshInstallSignsInAsAGuestWithoutBeingAsked(@TempDir Path dir) {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200, TOKENS));
+        t.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":true,\"user_metadata\":{}}"));
+
+        Account account = new Account(
+                new Supabase("https://p.supabase.co", "anon-key", t), dir.resolve("session.json"));
+
+        Account.Session guest = account.ensureSession().orElseThrow();
+
+        assertTrue(guest.anonymous());
+        assertFalse(guest.named(), "a vendégnek nincs neve, tehát nincs mibol kilepni");
+        assertEquals("https://p.supabase.co/auth/v1/signup", t.calls.get(0).url());
+        assertEquals("{\"data\":{}}", t.calls.get(0).body());
+
+        assertTrue(Files.isRegularFile(dir.resolve("guest.json")), "a vendég identitás nem maradt meg");
+    }
+
+    @Test
+    void aSecondStartReusesTheGuestInsteadOfMakingAnother(@TempDir Path dir) {
+        FakeTransport first = new FakeTransport();
+        first.answers.add(new Transport.Res(200, TOKENS));
+        first.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":true,\"user_metadata\":{}}"));
+
+        Path file = dir.resolve("session.json");
+        new Account(new Supabase("https://p.supabase.co", "anon-key", first), file).ensureSession();
+
+        FakeTransport again = new FakeTransport();
+        Account.Session back = new Account(new Supabase("https://p.supabase.co", "anon-key", again), file)
+                .ensureSession().orElseThrow();
+
+        assertEquals("u-guest", back.userId());
+        assertEquals(java.util.List.of(), again.calls, "nem lett volna szabad újra hálózathoz nyúlnia");
+    }
+
+    @Test
+    void registeringAsAGuestKeepsTheSameUserAndItsRuns(@TempDir Path dir) throws Exception {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200, TOKENS));
+        t.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":true,\"user_metadata\":{}}"));
+
+        Account account = new Account(
+                new Supabase("https://p.supabase.co", "anon-key", t), dir.resolve("session.json"));
+        account.ensureSession();
+
+        t.answers.add(new Transport.Res(200, "{\"id\":\"u-guest\",\"email\":\"a@b.hu\"}"));
+        t.answers.add(new Transport.Res(201, ""));
+        t.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":false,\"user_metadata\":{\"display_name\":\"zsombi\"}}"));
+
+        Account.Session named = account.signUp("a@b.hu", "zsombi", "titkos123").orElseThrow();
+
+        assertEquals("u-guest", named.userId(), "a felminősítés nem tarthatja meg a futásokat új user id-vel");
+        assertTrue(named.named());
+
+        FakeTransport.Call upgrade = t.calls.get(2);
+        assertEquals("PUT", upgrade.method());
+        assertEquals("https://p.supabase.co/auth/v1/user", upgrade.url());
+        assertTrue(upgrade.body().contains("\"display_name\":\"zsombi\""), upgrade.body());
+
+        FakeTransport.Call profile = t.calls.get(3);
+        assertEquals("https://p.supabase.co/rest/v1/profiles", profile.url());
+        assertTrue(profile.body().contains("\"user_id\":\"u-guest\""), profile.body());
+
+        assertFalse(Files.exists(dir.resolve("guest.json")), "a vendégfájl feleslegessé vált");
+    }
+
+    @Test
+    void aTakenUsernameSaysSo(@TempDir Path dir) {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200, TOKENS));
+        t.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":true,\"user_metadata\":{}}"));
+
+        Account account = new Account(
+                new Supabase("https://p.supabase.co", "anon-key", t), dir.resolve("session.json"));
+        account.ensureSession();
+
+        t.answers.add(new Transport.Res(200, "{\"id\":\"u-guest\"}"));
+        t.answers.add(new Transport.Res(409, "{\"code\":\"23505\"}"));
+
+        Account.AuthException e = assertThrows(Account.AuthException.class,
+                () -> account.signUp("a@b.hu", "foglalt", "titkos123"));
+
+        assertEquals("ui.nameTaken", e.messageKey());
+    }
+
+    @Test
+    void signingOutGoesBackToTheGuestRatherThanNobody(@TempDir Path dir) throws Exception {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200, TOKENS));
+        t.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":true,\"user_metadata\":{}}"));
+
+        Path file = dir.resolve("session.json");
+        Account account = new Account(new Supabase("https://p.supabase.co", "anon-key", t), file);
+        account.ensureSession();
+
+        t.answers.add(new Transport.Res(200, TOKENS));
+        t.answers.add(new Transport.Res(200, USER));
+        account.signIn("zsombi@pelda.hu", "titkos123");
+        assertTrue(account.session().orElseThrow().named());
+
+        account.signOut();
+
+        assertEquals("u-guest", account.session().orElseThrow().userId());
+        assertTrue(account.session().orElseThrow().anonymous());
+    }
+
+    @Test
     void signingOutForgetsTheSession(@TempDir Path dir) throws Exception {
         FakeTransport t = new FakeTransport();
         t.answers.add(new Transport.Res(200, TOKENS));

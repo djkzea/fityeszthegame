@@ -34,20 +34,48 @@ public final class Account {
         }
     }
 
-    public record Session(String accessToken, String refreshToken, String userId, String displayName) { }
+    public record Session(String accessToken, String refreshToken, String userId, String displayName,
+                          boolean anonymous) {
+
+        /** A guest session, or one whose account has no name on it yet. */
+        public boolean named() {
+            return !anonymous && displayName != null && !displayName.isBlank();
+        }
+    }
 
     private final Supabase sb;
     private final Path sessionFile;
 
+    /**
+     * The guest identity, kept beside the real one.
+     *
+     * Signing out of an account returns the player to the guest they were
+     * before it, rather than stranding the runs that guest has in the cloud.
+     */
+    private final Path guestFile;
+
     private Session session;
+
+    /** Set when the address put on an account still has to be confirmed by e-mail. */
+    private boolean emailPending = false;
 
     public Account(Supabase sb, Path sessionFile) {
         this.sb = sb;
         this.sessionFile = sessionFile;
+        this.guestFile = sessionFile.resolveSibling("guest.json");
     }
 
     public Optional<Session> session() {
         return Optional.ofNullable(session);
+    }
+
+    /**
+     * Whether the last registration left an address waiting on its confirmation
+     * link. The session works either way; the address does not reach another
+     * machine until the link is clicked.
+     */
+    public boolean emailPending() {
+        return emailPending;
     }
 
     /** The session this machine remembers from last time. */
@@ -82,6 +110,60 @@ public final class Account {
      * If that function has not been deployed, a username cannot be signed in at
      * all, and saying so is more use than one more "wrong details".
      */
+    /**
+     * Makes sure there is somebody to save as, without asking the player anything.
+     *
+     * A fresh install signs in anonymously: the run then goes to the account
+     * row from the first chapter, and the player never saw a login screen. The
+     * identity lives in this machine's guest file until they put an address on
+     * it, which is what turns it into a real account they can also reach from
+     * the website.
+     *
+     * Best effort throughout - no project, no network, or anonymous sign-ins
+     * turned off on the project all mean the game plays on and saves locally.
+     */
+    public Optional<Session> ensureSession() {
+
+        if (restore().isPresent()) {
+            return Optional.of(session);
+        }
+
+        try {
+            session = Json.mapper().readValue(Files.readString(guestFile), Session.class);
+            store(session, sessionFile);
+            return Optional.of(session);
+
+        } catch (IOException noGuestYet) {
+            // nothing saved on this machine; make one
+        }
+
+        try {
+            return Optional.of(signInAnonymously());
+        } catch (AuthException e) {
+            System.err.println("account: " + e.messageKey());
+            return Optional.empty();
+        }
+    }
+
+    /** A new guest. The project has to allow anonymous sign-ins for this to work. */
+    public Session signInAnonymously() throws AuthException {
+
+        Transport.Res res = call("POST", "/auth/v1/signup", "{\"data\":{}}", null);
+
+        if (!res.ok()) {
+            throw new AuthException("ui.authOffline");
+        }
+
+        JsonNode tokens = read(res.body());
+
+        Session guest = finish(tokens.path("access_token").asText(),
+                tokens.path("refresh_token").asText());
+
+        store(guest, guestFile);
+
+        return guest;
+    }
+
     public Session signIn(String identifier, String password) throws AuthException {
 
         String id = identifier.trim();
@@ -117,10 +199,21 @@ public final class Account {
     }
 
     /**
-     * Registers an account. An empty answer means Supabase wants the address
-     * confirmed first - the sign-up worked, the session comes after the click.
+     * Puts an address and a name on the player.
+     *
+     * A guest is upgraded rather than replaced: the same user id keeps its
+     * runs, which is the whole point of signing in anonymously first. Somebody
+     * with no session at all gets an ordinary sign-up.
+     *
+     * An empty answer means Supabase wants the address confirmed before the
+     * account is usable from anywhere else - the session in hand keeps working
+     * either way.
      */
     public Optional<Session> signUp(String email, String username, String password) throws AuthException {
+
+        if (session != null && session.anonymous()) {
+            return Optional.of(upgrade(email.trim(), username.trim(), password));
+        }
 
         Transport.Res res = call("POST", "/auth/v1/signup",
                 write(new SignUpBody(email.trim(), password, new Meta(username.trim()))), null);
@@ -139,6 +232,49 @@ public final class Account {
         return Optional.empty();
     }
 
+    /**
+     * Turns the guest into a named account, keeping the user id - and with it
+     * every run already saved under it.
+     *
+     * The profile row is written here rather than by the sign-up trigger: that
+     * trigger fires on a new user, and this user is not new.
+     */
+    private Session upgrade(String email, String username, String password) throws AuthException {
+
+        Transport.Res res = call("PUT", "/auth/v1/user",
+                write(new UpgradeBody(email, password, new Meta(username))), session.accessToken());
+
+        if (!res.ok()) {
+            throw new AuthException("ui.authFailed");
+        }
+
+        JsonNode updated = read(res.body());
+
+        // With confirmations on, the address sits in new_email until the link in
+        // the mail is clicked - the player is signed in here, but not yet anywhere else.
+        emailPending = !updated.path("new_email").asText("").isBlank()
+                || updated.path("email").asText("").isBlank();
+
+        Transport.Res profile = call("POST", "/rest/v1/profiles",
+                write(new ProfileBody(session.userId(), username)), session.accessToken());
+
+        // 409 is the username's unique index saying somebody else has it
+        if (profile.status() == 409) {
+            throw new AuthException("ui.nameTaken");
+        }
+
+        Session named = finish(session.accessToken(), session.refreshToken());
+
+        // the guest identity and the account are the same user now
+        try {
+            Files.deleteIfExists(guestFile);
+        } catch (IOException e) {
+            System.err.println("session: " + e.getMessage());
+        }
+
+        return named;
+    }
+
     public void signOut() {
 
         session = null;
@@ -148,6 +284,8 @@ public final class Account {
         } catch (IOException e) {
             System.err.println("session: " + e.getMessage());
         }
+
+        ensureSession();
     }
 
     /**
@@ -184,26 +322,27 @@ public final class Account {
                 accessToken,
                 refreshToken,
                 user.path("id").asText(),
-                user.path("user_metadata").path("display_name").asText());
+                user.path("user_metadata").path("display_name").asText(),
+                user.path("is_anonymous").asBoolean(false));
 
-        store(session);
+        store(session, sessionFile);
 
         return session;
     }
 
-    private void store(Session s) {
+    private void store(Session s, Path file) {
 
         try {
-            Path parent = sessionFile.getParent();
+            Path parent = file.getParent();
 
             if (parent != null) {
                 Files.createDirectories(parent);
             }
 
-            Files.writeString(sessionFile, Json.mapper().writeValueAsString(s));
+            Files.writeString(file, Json.mapper().writeValueAsString(s));
 
             try {
-                Files.setPosixFilePermissions(sessionFile, PosixFilePermissions.fromString("rw-------"));
+                Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-------"));
             } catch (UnsupportedOperationException ignored) {
                 // Windows has no POSIX permissions; the file stays as it is.
             }
@@ -242,6 +381,10 @@ public final class Account {
     private record PasswordBody(String email, String password) { }
 
     private record SignUpBody(String email, String password, Meta data) { }
+
+    private record UpgradeBody(String email, String password, Meta data) { }
+
+    private record ProfileBody(String user_id, String username) { }
 
     private record Meta(String display_name) { }
 

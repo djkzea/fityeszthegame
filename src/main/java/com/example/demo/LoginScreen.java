@@ -299,7 +299,9 @@ public final class LoginScreen {
             try {
                 if (signUp) {
                     in = account.signUp(mail, id, pass).isPresent();
-                    message = in ? null : Lang.t("ui.checkEmail");
+                    // Signed in or not, an address that still needs confirming is
+                    // the one thing the player has to be told about.
+                    message = in && !account.emailPending() ? null : Lang.t("ui.checkEmail");
                 } else {
                     account.signIn(id, pass);
                     in = true;

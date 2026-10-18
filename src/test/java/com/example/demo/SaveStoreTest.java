@@ -157,6 +157,82 @@ class SaveStoreTest {
         assertTrue(call.body().contains("\"scene\":\"lakatosRules\""));
     }
 
+    private static FakeTransport cloudWith(String rows) {
+        FakeTransport t = new FakeTransport();
+        t.answers.add(new Transport.Res(200, rows));
+        return t;
+    }
+
+    @Test
+    void signingInKeepsBothTheAccountsRunAndTheGuestsOne(@TempDir Path dir) {
+
+        FakeTransport t = cloudWith(
+                "[{\"slot\":1,\"player_name\":\"Zsombi\",\"chapter\":5,\"updated_at\":\"2026-10-16T10:00:00Z\"}]");
+
+        SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
+
+        // what was played as a guest, in the slot the account also uses
+        store.saveLocal(1, run(2, "lakatosRules", "2026-10-17T20:00:00Z"));
+
+        store.reconcile("acc1");
+
+        // the account's run takes its own slot back
+        assertEquals(5, store.loadLocal(1).orElseThrow().chapter());
+
+        // and the guest's run is still there, moved out of the way
+        assertEquals(2, store.loadLocal(2).orElseThrow().chapter());
+    }
+
+    @Test
+    void anUntouchedSlotJustTakesTheAccountsRun(@TempDir Path dir) {
+
+        FakeTransport t = cloudWith(
+                "[{\"slot\":3,\"player_name\":\"Anna\",\"chapter\":4,\"updated_at\":\"2026-10-16T10:00:00Z\"}]");
+
+        SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
+
+        store.reconcile("acc1");
+
+        assertEquals("Anna", store.loadLocal(3).orElseThrow().playerName());
+        assertTrue(store.loadLocal(1).isEmpty());
+    }
+
+    @Test
+    void theSameRunOnBothSidesIsNotDuplicated(@TempDir Path dir) {
+
+        FakeTransport t = cloudWith(
+                "[{\"slot\":1,\"player_name\":\"Zsombi\",\"chapter\":2,\"updated_at\":\"2026-10-17T20:00:00Z\"}]");
+
+        SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
+        store.saveLocal(1, run(2, "lakatosRules", "2026-10-17T20:00:00Z"));
+
+        store.reconcile("acc1");
+
+        assertTrue(store.loadLocal(2).isEmpty(), "ugyanaz a futás nem foglalhat két helyet");
+        assertTrue(store.loadLocal(3).isEmpty());
+    }
+
+    @Test
+    void withEverySlotTakenTheGuestsRunIsStillNotDeleted(@TempDir Path dir) throws IOException {
+
+        FakeTransport t = cloudWith(
+                "[{\"slot\":1,\"player_name\":\"Zsombi\",\"chapter\":5,\"updated_at\":\"2026-10-16T10:00:00Z\"},"
+                        + "{\"slot\":2,\"player_name\":\"Zsombi\",\"chapter\":6,\"updated_at\":\"2026-10-16T11:00:00Z\"},"
+                        + "{\"slot\":3,\"player_name\":\"Zsombi\",\"chapter\":7,\"updated_at\":\"2026-10-16T12:00:00Z\"}]");
+
+        SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
+        store.saveLocal(1, run(2, "lakatosRules", "2026-10-17T20:00:00Z"));
+
+        store.reconcile("acc1");
+
+        assertEquals(5, store.loadLocal(1).orElseThrow().chapter());
+
+        try (var files = Files.list(dir)) {
+            assertTrue(files.anyMatch(f -> f.getFileName().toString().contains("-guest-")),
+                    "a vendég futása nyomtalanul eltűnt");
+        }
+    }
+
     @Test
     void aProjectWithoutTheMigrationStillGetsTheRun(@TempDir Path dir) {
 

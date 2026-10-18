@@ -495,18 +495,22 @@ public class OpeningScreen {
     /** The title menu itself. */
     private void buildMenu(VBox menu) {
 
+        // A guest session has no name on it, and offering to sign out of one
+        // would be offering to leave an account the player never joined.
         String who = account == null
                 ? null
-                : account.session().map(Account.Session::displayName).orElse(null);
+                : account.session().filter(Account.Session::named)
+                        .map(Account.Session::displayName).orElse(null);
 
         Button signIn = menuButton(
-                who == null || who.isBlank() ? Lang.t("ui.logIn") : who,
+                who == null ? Lang.t("ui.logIn") : who,
                 true,
                 who == null
                         ? onSignIn
                         : () -> {
                             account.signOut();
                             runs = java.util.Map.of();
+                            loadRuns();
                             rebuild();
                         });
 

@@ -140,7 +140,24 @@ public class HelloApplication extends Application {
 
         Runnable back = () -> dip(() -> shell.getChildren().set(0, titleNow().getRoot()), 420);
 
-        LoginScreen screen = new LoginScreen(controller.account(), back, back);
+        // Signing in is where the guest's runs and the account's runs meet; the
+        // store settles that before the title screen asks what there is to load.
+        Runnable signedIn = () -> {
+
+            Thread merge = new Thread(() -> {
+
+                controller.account().session().ifPresent(s ->
+                        controller.saves().reconcile(s.accessToken()));
+
+                Platform.runLater(back);
+
+            }, "fityesz-merge");
+
+            merge.setDaemon(true);
+            merge.start();
+        };
+
+        LoginScreen screen = new LoginScreen(controller.account(), signedIn, back);
 
         dip(() -> shell.getChildren().set(0, screen.getRoot()), 420);
     }

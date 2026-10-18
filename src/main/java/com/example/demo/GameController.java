@@ -99,9 +99,16 @@ public class GameController {
         ui.setOnGameRestart(this::restartGame);
         ui.setOnLog(() -> ui.showLog(chatlog.entries()));
 
-        // the session from last time, so the title screen already knows the name
+        // The session from last time, or a new guest one - off the JavaFX thread,
+        // because signing in anonymously is a network call and the title screen
+        // must not wait for it. Without it the game simply saves locally.
         if (account != null) {
+
             account.restore();
+
+            Thread opening = new Thread(account::ensureSession, "fityesz-session");
+            opening.setDaemon(true);
+            opening.start();
         }
     }
 

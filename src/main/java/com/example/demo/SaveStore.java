@@ -205,6 +205,81 @@ public class SaveStore {
     }
 
     /**
+     * Brings the account's runs onto this machine without losing the guest's.
+     *
+     * Signing in is where two histories meet: the runs played as a guest sit in
+     * the local files, the account's runs sit in the cloud, and Supabase cannot
+     * merge two users. The account wins its own slots - those are the runs that
+     * follow the player to another machine - and a guest run it would have
+     * covered moves to a free slot. With no free slot the guest run is still
+     * not thrown away: it is kept beside the save as a numbered leftover, so
+     * nothing a player did disappears behind a login.
+     */
+    public void reconcile(String token) {
+
+        java.util.Map<Integer, SaveData> cloud = fetchCloud(token);
+
+        if (cloud.isEmpty()) {
+            return;
+        }
+
+        for (int slot = 1; slot <= SLOTS; slot++) {
+
+            SaveData theirs = cloud.get(slot);
+            SaveData ours = loadLocal(slot).orElse(null);
+
+            if (theirs == null) {
+                continue;
+            }
+
+            if (ours != null && !sameRun(ours, theirs)) {
+
+                int free = freeSlot(cloud);
+
+                if (free > 0) {
+                    saveLocal(free, ours);
+                } else {
+                    keepAside(ours, slot);
+                }
+            }
+
+            saveLocal(slot, theirs);
+        }
+    }
+
+    /** A slot neither this machine nor the account is using. 0 if there is none. */
+    private int freeSlot(java.util.Map<Integer, SaveData> cloud) {
+
+        for (int slot = 1; slot <= SLOTS; slot++) {
+            if (cloud.get(slot) == null && loadLocal(slot).isEmpty()) {
+                return slot;
+            }
+        }
+
+        return 0;
+    }
+
+    /** Two reads of the same run - the same moment, saved by the same player. */
+    private static boolean sameRun(SaveData a, SaveData b) {
+        return java.util.Objects.equals(a.updatedAt(), b.updatedAt())
+                && java.util.Objects.equals(a.playerName(), b.playerName());
+    }
+
+    /** Somewhere a run can wait that is not a slot. Not shown anywhere; just not deleted. */
+    private void keepAside(SaveData run, int slot) {
+
+        Path aside = dir.resolve("save-slot" + slot + "-guest-"
+                + java.time.Instant.now().toEpochMilli() + ".json");
+
+        try {
+            Files.createDirectories(dir);
+            Files.writeString(aside, Json.mapper().writeValueAsString(run));
+        } catch (IOException e) {
+            System.err.println("save: " + e.getMessage());
+        }
+    }
+
+    /**
      * What every slot holds, this machine and the account taken together, the
      * fresher of the two winning. A slot with no run at all is left out.
      */
