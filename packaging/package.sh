@@ -44,7 +44,13 @@ COMMON=(
 case "$(uname -s)" in
   Darwin)
     TYPE="${TYPE:-dmg}"
-    EXTRA=(--icon packaging/app.icns --mac-package-identifier com.fityeszthegame.kronika)
+    # packaging/mac holds the drag-to-Applications window: its background and
+    # the AppleScript that places the icons on it.
+    EXTRA=(
+      --icon packaging/app.icns
+      --mac-package-identifier com.fityeszthegame.kronika
+      --resource-dir packaging/mac
+    )
     ;;
   Linux)
     TYPE="${TYPE:-deb}"

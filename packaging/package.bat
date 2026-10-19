@@ -35,6 +35,8 @@ jpackage ^
   --app-version %VERSION% ^
   --vendor fityeszthegame.com ^
   --icon packaging\app.ico ^
+  --resource-dir packaging\win ^
+  --verbose ^
   --win-menu ^
   --win-shortcut ^
   --win-dir-chooser ^
