@@ -21,8 +21,11 @@ copy /y target\demo-*.jar target\app-input\ >nul
 
 for %%f in (target\app-input\demo-*.jar) do set MAIN_JAR=%%~nxf
 
-rem Keep jpackage's working files, so the WiX source it generates can be read
-rem back out of the log - that is where the wizard's bitmaps are set.
+rem The wizard's bitmaps are named by absolute path in the WiX source, and WiX
+rem compiles in a temporary directory - so the path is filled in here.
+powershell -NoProfile -Command ^
+  "(Get-Content 'packaging\win\main.wxs.in' -Raw) -replace '@ART@', (Resolve-Path 'packaging\win').Path | Set-Content -NoNewline -Encoding UTF8 'packaging\win\main.wxs'" || exit /b 1
+
 if exist target\winwork rmdir /s /q target\winwork
 
 if exist target\installer rmdir /s /q target\installer

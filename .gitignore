@@ -42,3 +42,4 @@ src/main/resources/com/example/demo/supabase.properties
 ### Playwright MCP screenshots
 .playwright-mcp/
 packaging/win/overrides.wxi
+packaging/win/main.wxs
