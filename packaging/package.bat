@@ -21,6 +21,11 @@ copy /y target\demo-*.jar target\app-input\ >nul
 
 for %%f in (target\app-input\demo-*.jar) do set MAIN_JAR=%%~nxf
 
+rem The wizard's bitmaps are named by absolute path inside overrides.wxi, and
+rem WiX compiles in a temporary directory - so the path is filled in here.
+powershell -NoProfile -Command ^
+  "(Get-Content 'packaging\win\overrides.wxi.in') -replace '@ART@', ((Resolve-Path 'packaging\win').Path -replace '\\','\\') | Set-Content -Encoding UTF8 'packaging\win\overrides.wxi'" || exit /b 1
+
 if exist target\installer rmdir /s /q target\installer
 
 echo ==^> jpackage --type %TYPE%
