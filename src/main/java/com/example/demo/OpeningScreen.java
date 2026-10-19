@@ -659,17 +659,20 @@ public class OpeningScreen {
 
         runs = saves.runs(null);
 
-        String token = account == null
-                ? null
-                : account.session().map(Account.Session::accessToken).orElse(null);
+        Account.Session signedIn = account == null ? null : account.session().orElse(null);
 
-        if (token == null) {
+        if (signedIn == null) {
             return;
         }
 
         Thread worker = new Thread(() -> {
 
-            java.util.Map<Integer, SaveData> merged = saves.runs(token);
+            // Both directions, every time the title page is built: a run played
+            // offline, or before signing in, reaches the account here rather
+            // than waiting for its next chapter to end.
+            saves.reconcile(signedIn.userId(), signedIn.accessToken());
+
+            java.util.Map<Integer, SaveData> merged = saves.runs(signedIn.accessToken());
 
             javafx.application.Platform.runLater(() -> {
                 runs = merged;

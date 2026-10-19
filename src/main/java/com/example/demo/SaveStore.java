@@ -105,10 +105,31 @@ public class SaveStore {
     }
 
     private static Instant instantOf(SaveData d) {
-        try {
-            return d.updatedAt() == null ? null : Instant.parse(d.updatedAt());
-        } catch (RuntimeException e) {
+        return d == null ? null : moment(d.updatedAt());
+    }
+
+    /**
+     * A saved moment, however it was spelled.
+     *
+     * Java writes "…711238Z"; Postgres hands the same instant back as
+     * "…711238+00:00". Comparing those as strings makes one run look like two,
+     * which is how a run that was already in the account ended up copied into
+     * a second slot.
+     */
+    private static Instant moment(String text) {
+
+        if (text == null || text.isBlank()) {
             return null;
+        }
+
+        try {
+            return java.time.OffsetDateTime.parse(text).toInstant();
+        } catch (RuntimeException notAnOffset) {
+            try {
+                return Instant.parse(text);
+            } catch (RuntimeException unreadable) {
+                return null;
+            }
         }
     }
 
@@ -205,23 +226,26 @@ public class SaveStore {
     }
 
     /**
-     * Brings the account's runs onto this machine without losing the guest's.
+     * Settles this machine's runs against the account's, in both directions.
      *
-     * Signing in is where two histories meet: the runs played as a guest sit in
-     * the local files, the account's runs sit in the cloud, and Supabase cannot
-     * merge two users. The account wins its own slots - those are the runs that
-     * follow the player to another machine - and a guest run it would have
-     * covered moves to a free slot. With no free slot the guest run is still
-     * not thrown away: it is kept beside the save as a numbered leftover, so
-     * nothing a player did disappears behind a login.
+     * Signing in is where two histories meet: runs played as a guest sit in the
+     * local files, the account's runs sit in the cloud, and Supabase cannot
+     * merge two users. So:
+     *
+     *  - a run only the account has comes down;
+     *  - a run only this machine has goes up, which is how a guest's runs are
+     *    claimed - and how a run played offline reaches the account at all;
+     *  - the same run on both sides, carried further here, goes up;
+     *  - two genuinely different runs in one slot: the account keeps the slot,
+     *    because that is the run that follows the player to another machine,
+     *    and this machine's run moves to a free slot (or, with none free, to a
+     *    leftover file) rather than being written over.
+     *
+     * Safe to run more than once: once the two sides agree, nothing moves.
      */
-    public void reconcile(String token) {
+    public void reconcile(String userId, String token) {
 
         java.util.Map<Integer, SaveData> cloud = fetchCloud(token);
-
-        if (cloud.isEmpty()) {
-            return;
-        }
 
         for (int slot = 1; slot <= SLOTS; slot++) {
 
@@ -229,22 +253,65 @@ public class SaveStore {
             SaveData ours = loadLocal(slot).orElse(null);
 
             if (theirs == null) {
+
+                if (ours != null) {
+                    pushCloud(slot, ours, userId, token);
+                }
+
                 continue;
             }
 
-            if (ours != null && !sameRun(ours, theirs)) {
+            if (ours == null) {
+                saveLocal(slot, theirs);
+                continue;
+            }
 
-                int free = freeSlot(cloud);
+            if (sameRun(ours, theirs)) {
+                continue;
+            }
 
-                if (free > 0) {
-                    saveLocal(free, ours);
-                } else {
-                    keepAside(ours, slot);
-                }
+            if (continues(ours, theirs)) {
+                pushCloud(slot, ours, userId, token);
+                continue;
+            }
+
+            int free = freeSlot(cloud);
+
+            if (free > 0) {
+                saveLocal(free, ours);
+                pushCloud(free, ours, userId, token);
+            } else {
+                keepAside(ours, slot);
             }
 
             saveLocal(slot, theirs);
         }
+    }
+
+    /** The same run, taken further on this machine than the account has seen. */
+    private static boolean continues(SaveData ours, SaveData theirs) {
+
+        if (!java.util.Objects.equals(ours.playerName(), theirs.playerName())) {
+            return false;
+        }
+
+        // a run does not go backwards: an earlier chapter under the same name
+        // is a different run, not this one carried further
+        if (ours.chapter() < theirs.chapter()) {
+            return false;
+        }
+
+        int decisionsHere = ours.history() == null ? 0 : ours.history().size();
+        int decisionsThere = theirs.history() == null ? 0 : theirs.history().size();
+
+        if (decisionsHere < decisionsThere) {
+            return false;
+        }
+
+        Instant here = moment(ours.updatedAt());
+        Instant there = moment(theirs.updatedAt());
+
+        return here != null && there != null && here.isAfter(there);
     }
 
     /** A slot neither this machine nor the account is using. 0 if there is none. */
@@ -261,7 +328,11 @@ public class SaveStore {
 
     /** Two reads of the same run - the same moment, saved by the same player. */
     private static boolean sameRun(SaveData a, SaveData b) {
-        return java.util.Objects.equals(a.updatedAt(), b.updatedAt())
+
+        Instant here = moment(a.updatedAt());
+        Instant there = moment(b.updatedAt());
+
+        return here != null && here.equals(there)
                 && java.util.Objects.equals(a.playerName(), b.playerName());
     }
 

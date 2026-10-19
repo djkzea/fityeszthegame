@@ -174,7 +174,7 @@ class SaveStoreTest {
         // what was played as a guest, in the slot the account also uses
         store.saveLocal(1, run(2, "lakatosRules", "2026-10-17T20:00:00Z"));
 
-        store.reconcile("acc1");
+        store.reconcile("u-1", "acc1");
 
         // the account's run takes its own slot back
         assertEquals(5, store.loadLocal(1).orElseThrow().chapter());
@@ -191,7 +191,7 @@ class SaveStoreTest {
 
         SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
 
-        store.reconcile("acc1");
+        store.reconcile("u-1", "acc1");
 
         assertEquals("Anna", store.loadLocal(3).orElseThrow().playerName());
         assertTrue(store.loadLocal(1).isEmpty());
@@ -206,7 +206,7 @@ class SaveStoreTest {
         SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
         store.saveLocal(1, run(2, "lakatosRules", "2026-10-17T20:00:00Z"));
 
-        store.reconcile("acc1");
+        store.reconcile("u-1", "acc1");
 
         assertTrue(store.loadLocal(2).isEmpty(), "ugyanaz a futás nem foglalhat két helyet");
         assertTrue(store.loadLocal(3).isEmpty());
@@ -223,7 +223,7 @@ class SaveStoreTest {
         SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
         store.saveLocal(1, run(2, "lakatosRules", "2026-10-17T20:00:00Z"));
 
-        store.reconcile("acc1");
+        store.reconcile("u-1", "acc1");
 
         assertEquals(5, store.loadLocal(1).orElseThrow().chapter());
 
@@ -231,6 +231,74 @@ class SaveStoreTest {
             assertTrue(files.anyMatch(f -> f.getFileName().toString().contains("-guest-")),
                     "a vendég futása nyomtalanul eltűnt");
         }
+    }
+
+    @Test
+    void theSameMomentSpelledTwoWaysIsOneRun(@TempDir Path dir) {
+
+        // Java writes Z, Postgres hands the same instant back as +00:00
+        FakeTransport t = cloudWith(
+                "[{\"slot\":1,\"player_name\":\"Zsombi\",\"chapter\":4,\"scene\":\"chapter4Meeting\","
+                        + "\"updated_at\":\"2026-10-19T06:42:29.711238+00:00\"}]");
+
+        SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
+        store.saveLocal(1, new SaveData("Zsombi", "Zsombi", 4, "chapter4Meeting", 0, 0, 1,
+                List.of(), List.of(), List.of(), null, null, "2026-10-19T06:42:29.711238Z"));
+
+        store.reconcile("u-1", "acc1");
+
+        assertTrue(store.loadLocal(2).isEmpty(), "ugyanaz a futás nem másolódhat másik helyre");
+        assertTrue(store.loadLocal(3).isEmpty());
+        assertEquals(1, t.calls.size(), "nem volt mit feltölteni");
+    }
+
+    @Test
+    void aCloudTimestampIsReadableByNewer() {
+
+        SaveData fromCloud = new SaveData("Zsombi", "Zsombi", 4, null, 0, 0, 1,
+                List.of(), List.of(), List.of(), null, null, "2026-10-19T06:42:29.711238+00:00");
+        SaveData older = run(2, "chapter2", "2026-10-18T10:00:00Z");
+
+        assertEquals(fromCloud, SaveStore.newer(older, fromCloud));
+        assertEquals(fromCloud, SaveStore.newer(fromCloud, older));
+    }
+
+    @Test
+    void aRunTheAccountHasNeverSeenIsSentUp(@TempDir Path dir) {
+
+        FakeTransport t = cloudWith("[]");
+        t.answers.add(new Transport.Res(201, ""));
+
+        SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
+        store.saveLocal(2, run(7, "boss3Defeated", "2026-10-19T06:36:28Z"));
+
+        store.reconcile("u-1", "acc1");
+
+        assertEquals(2, t.calls.size(), "a feltöltés elmaradt");
+        assertTrue(t.calls.get(1).body().contains("\"slot\":2"), t.calls.get(1).body());
+        assertTrue(t.calls.get(1).body().contains("\"chapter\":7"), t.calls.get(1).body());
+    }
+
+    @Test
+    void aRunCarriedFurtherHereGoesUpInsteadOfBeingOverwritten(@TempDir Path dir) {
+
+        FakeTransport t = cloudWith(
+                "[{\"slot\":1,\"player_name\":\"Zsombi\",\"chapter\":2,\"history\":[{\"choicePointId\":\"ch1.q1\",\"optionIndex\":0}],"
+                        + "\"updated_at\":\"2026-10-18T10:00:00Z\"}]");
+        t.answers.add(new Transport.Res(201, ""));
+
+        SaveStore store = new SaveStore(dir, new Supabase("https://p.supabase.co", "anon-key", t));
+
+        // the same run, played on past that point while offline
+        store.saveLocal(1, new SaveData("Zsombi", "Zsombi", 5, "chapter5", 120, 30, 2,
+                List.of(), List.of(new SaveData.Decision("ch1.q1", 0), new SaveData.Decision("ch2.q", 1)),
+                List.of(), null, null, "2026-10-19T06:00:00Z"));
+
+        store.reconcile("u-1", "acc1");
+
+        assertEquals(5, store.loadLocal(1).orElseThrow().chapter(), "a régebbi felhős sor nem írhatja felül");
+        assertTrue(store.loadLocal(2).isEmpty(), "ugyanaz a futás nem foglalhat másik helyet");
+        assertTrue(t.calls.get(1).body().contains("\"chapter\":5"), t.calls.get(1).body());
     }
 
     @Test
