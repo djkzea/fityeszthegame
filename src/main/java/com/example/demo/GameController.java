@@ -2169,11 +2169,17 @@ public class GameController {
                         state.getPlayerHp() - damage
                 );
 
-                result = Lang.t("fight.bothAttacked");
+                // "Kapzs megütött! -%s HP" is written for exactly this moment,
+                // and the damage varies with his health and with the boss's
+                // trust - so it is told, not left as a placeholder.
+                result = Lang.t("fight.bothAttacked") + "\n"
+                        + Lang.t("boss3.hit", damage);
 
             } else {
 
-                result = Lang.t("boss3.hit");
+                // He defended and still took the hit - the same line the other
+                // two fights use here, which boss three never had.
+                result = Lang.t("boss3.struck");
             }
 
         } else {

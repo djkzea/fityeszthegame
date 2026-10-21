@@ -526,6 +526,7 @@ public final class Lang {
         p("boss3.heal",          "Kapzs gyógyult! +50 HP", "Kapzs healed! +50 HP");
         p("boss3.blocked",       "Kapzs kivédte.", "Kapzs blocked it.");
         p("boss3.hit",           "Kapzs megütött! -%s HP", "Kapzs hit you! -%s HP");
+        p("boss3.struck",        "Eltaláltad Kapzs Imrét! -20 HP", "You struck Kapzs Imre! -20 HP");
         p("boss3.win",           "Legyőzted Kapzs Imrét!", "You defeated Kapzs Imre!");
 
         // ── Boss abilities (always shown during a boss fight) ──────────────

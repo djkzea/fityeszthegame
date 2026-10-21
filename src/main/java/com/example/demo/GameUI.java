@@ -967,6 +967,7 @@ public class GameUI {
         logBand.setStyle("-fx-background-color: " + RED + ";");
 
         logList.setPadding(new Insets(4, 26, 10, 26));
+        logList.setStyle("-fx-background-color: " + PAPER + ";");
 
         logScroll = new ScrollPane(logList);
         logScroll.getStyleClass().add("log-scroll");
@@ -1806,7 +1807,7 @@ public class GameUI {
     private static String slimScrollbar() {
 
         String css = """
-                .log-scroll, .log-scroll > .viewport { -fx-background-color: transparent; -fx-background: transparent; }
+                .log-scroll, .log-scroll > .viewport { -fx-background-color: PAPER_COLOR; -fx-background: PAPER_COLOR; }
                 .log-scroll { -fx-padding: 0; }
                 .log-scroll .scroll-bar:vertical { -fx-background-color: transparent; -fx-pref-width: 6; -fx-padding: 0 4 0 0; }
                 .log-scroll .scroll-bar:vertical .track { -fx-background-color: rgb(230,223,208); -fx-background-radius: 0; -fx-border-color: transparent; }
@@ -1814,6 +1815,14 @@ public class GameUI {
                 .log-scroll .scroll-bar .increment-button, .log-scroll .scroll-bar .decrement-button { -fx-pref-height: 0; -fx-padding: 0; }
                 .log-scroll .scroll-bar .increment-arrow, .log-scroll .scroll-bar .decrement-arrow { -fx-padding: 0; -fx-shape: ""; }
                 """;
+
+
+        // Paper, not transparent. A tester on Windows read a log of white text:
+        // the rows that carry their own background - the decisions - came out
+        // right, everything else did not, which is what text drawn onto a
+        // see-through, scrolled surface does there. Giving the viewport the
+        // sheet's own colour gives the letters something to sit on.
+        css = css.replace("PAPER_COLOR", PAPER);
 
         return "data:text/css;base64,"
                 + java.util.Base64.getEncoder().encodeToString(css.getBytes(java.nio.charset.StandardCharsets.UTF_8));
