@@ -971,7 +971,7 @@ public class GameUI {
         logScroll = new ScrollPane(logList);
         logScroll.getStyleClass().add("log-scroll");
         logScroll.setFitToWidth(true);
-        logScroll.setPrefHeight(430);
+        logScroll.setMinHeight(120);
         logScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         VBox.setVgrow(logScroll, Priority.ALWAYS);
 
@@ -981,8 +981,12 @@ public class GameUI {
         logHint.setPadding(new Insets(10, 26, 16, 26));
 
         VBox logSheet = new VBox(logBand, logScroll, logHint);
-        logSheet.setMaxSize(820, 560);
-        logSheet.setMinHeight(Region.USE_PREF_SIZE);
+
+        // Tall enough to be worth opening, never taller than the window: the
+        // margin below is what keeps it inside, because a StackPane lays its
+        // child out within the space left after it. A fixed 560 card used to
+        // run off a short screen, and the red band went with it.
+        logSheet.setMaxSize(820, 620);
         logSheet.setStyle("-fx-background-color: " + PAPER + ";"
                 + "-fx-border-color: " + INK + ";"
                 + "-fx-border-width: 2;");
@@ -1001,8 +1005,17 @@ public class GameUI {
         logCard = new StackPane(logBackdrop, logShade, logSheet);
         logCard.setStyle("-fx-background-color: rgba(22,22,22,0.55);");
 
-        logBackdrop.fitWidthProperty().bind(logCard.widthProperty());
-        logBackdrop.fitHeightProperty().bind(logCard.heightProperty());
+        StackPane.setMargin(logSheet, new Insets(26));
+
+        // Bound to the stage area, not to the card: the card's own size is what
+        // its children ask for, so sizing a child from the card fed the card's
+        // height back into itself and it grew every pass - 941px inside a 650px
+        // window, which pushed the sheet out of the clipped view and left the
+        // player looking at blank paper. Unmanaged, so it never takes part in
+        // the layout at all.
+        logBackdrop.setManaged(false);
+        logBackdrop.fitWidthProperty().bind(stagePane.widthProperty());
+        logBackdrop.fitHeightProperty().bind(stagePane.heightProperty());
         logCard.setVisible(false);
         logCard.setManaged(false);
         logCard.getStylesheets().add(slimScrollbar());

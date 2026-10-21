@@ -84,6 +84,23 @@ class ResumeSmokeTest {
         assertNotEquals(Lang.t("ui.title").toUpperCase(), stage.chapter());
     }
 
+    /** Polls for something a background thread is about to produce. */
+    private static <T> T waitFor(java.util.function.Supplier<T> ready, String whatWentWrong)
+            throws InterruptedException {
+
+        for (int i = 0; i < 100; i++) {
+            T value = ready.get();
+
+            if (value != null) {
+                return value;
+            }
+
+            Thread.sleep(50);
+        }
+
+        throw new AssertionError(whatWentWrong);
+    }
+
     @Test
     void aRestoredRunReopensItsSceneAndKeepsSaving() throws Exception {
 
@@ -141,9 +158,12 @@ class ResumeSmokeTest {
             });
         }
 
-        assertTrue(Files.isRegularFile(file), "a mentes nem jott letre: " + file);
-
-        SaveData onDisk = new SaveStore(AppDirs.data()).loadLocal(1).orElseThrow();
+        // The autosave is written off the JavaFX thread now, so the file appears
+        // a moment after the click rather than within it.
+        SaveStore store = new SaveStore(AppDirs.data());
+        SaveData onDisk = waitFor(() -> store.loadLocal(1)
+                .filter(run -> !"lipotiOffer".equals(run.scene()))
+                .orElse(null), "a mentes nem jott letre: " + file);
         assertNotEquals("lipotiOffer", onDisk.scene(), "a jelenet nem lepett tovabb");
         assertEquals("Zsombi", onDisk.playerName());
         assertTrue(onDisk.log().size() > 1, "a naplo nem nott a kattintassal");

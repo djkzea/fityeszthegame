@@ -184,7 +184,14 @@ public class GameController {
         // Nothing has happened until the player has a name, and a save of the
         // name prompt would offer itself on the title screen as a run to continue.
         if (saving && state.getName() != null && !state.getName().isBlank()) {
-            saves.saveLocal(slot, snapshot());
+
+            // The snapshot is taken here, because it reads the screen - but
+            // writing it is JSON plus a file, which measured 141ms with a full
+            // log and grows with it. On the JavaFX thread that freezes the
+            // typewriter mid-sentence and lets held keys queue up, so the line
+            // is skipped and the choices arrive in the same breath.
+            SaveData data = snapshot();
+            network.submit(() -> saves.saveLocal(slot, data));
         }
     }
 
@@ -332,6 +339,8 @@ public class GameController {
 
         SaveData data = snapshot();
 
+        // Asked for by hand, from a menu: the player is not reading a line, so
+        // this one waits, and the save is on disk before the game resumes.
         saves.saveLocal(slot, data);
 
         if (!toCloud || account == null) {

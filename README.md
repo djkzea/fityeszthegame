@@ -29,6 +29,29 @@ jpackage uses it to write the .msi.
 It builds on macOS, Windows and Linux and uploads the three installers as
 artifacts.
 
+### Accounts after cloning
+
+`src/main/resources/com/example/demo/supabase.properties` holds the project's
+URL and publishable key, and it is **not** in the repository - so a fresh clone
+plays fine but cannot sign in: the game has no project to ask. Write the file
+once:
+
+    url=https://<project>.supabase.co
+    anonKey=<the publishable key>
+
+Both values are public by design - the website hands them to every visitor in
+its JavaScript, and row-level security is what protects the data - so they are
+safe to pass to whoever works on the game. If the website repo is checked out
+next to this one, the file can be generated from its `.env.local`:
+
+    grep -E '^NEXT_PUBLIC_SUPABASE_(URL|ANON_KEY)=' ../fityeszTheGameWebsite/.env.local \
+      | sed -e 's/^NEXT_PUBLIC_SUPABASE_URL=/url=/' \
+            -e 's/^NEXT_PUBLIC_SUPABASE_ANON_KEY=/anonKey=/' \
+      > src/main/resources/com/example/demo/supabase.properties
+
+`FITYESZ_SUPABASE_URL` and `FITYESZ_SUPABASE_ANON_KEY` do the same job from the
+environment, and win over the file.
+
 ### Accounts in a packaged build
 
 The Supabase URL and anon key live in
