@@ -120,6 +120,9 @@ class TypewriterTest {
 
         GameUI ui = controller.getUI();
 
+        // past the grace the line gets for having just appeared
+        Thread.sleep(400);
+
         // what a stalled thread hands over: both presses in the same pulse
         onFxThread(() -> {
             ui.pressEnterButton();
@@ -142,5 +145,48 @@ class TypewriterTest {
 
         assertNotEquals("lipotiOffer", onFxThread(controller::snapshot).scene(),
                 "a kesobbi Enter sem lepett tovabb");
+    }
+
+    /**
+     * The one from the field: the key that dismissed the legal card, or the
+     * click that took the last choice, is still on its way when the next line
+     * starts - and it finished a line nobody had read. Here the press lands in
+     * the same pulse as the line, which is the worst case.
+     */
+    @Test
+    void aPressFromTheScreenBeforeDoesNotEatTheLine() throws Exception {
+
+        Path home = Files.createTempDirectory("fityesz-home");
+        System.setProperty("user.home", home.toString());
+
+        try {
+            Platform.startup(() -> { });
+        } catch (IllegalStateException alreadyRunning) {
+            // another test started the toolkit first
+        }
+
+        SaveData saved = new SaveData("Zsombi", "Zsombi", 1, "lipotiOffer",
+                30, 10, 1, List.of(), List.of(), List.of(), null, null,
+                "2026-10-17T18:00:00Z");
+
+        GameController controller = onFxThread(() -> {
+            GameController c = new GameController(new Stage());
+            c.resume(saved);
+            c.getUI().pressEnterButton();
+            return c;
+        });
+
+        GameUI ui = controller.getUI();
+        int full = onFxThread(() -> ui.fullText().length());
+
+        assertTrue(onFxThread(ui::writtenSoFar) < full,
+                "a beragadt nyomas kiirta az egesz sort");
+
+        // and it is only held off, not broken: the line writes itself out
+        for (int i = 0; i < 200 && onFxThread(ui::writtenSoFar) < full; i++) {
+            Thread.sleep(25);
+        }
+
+        assertEquals(full, (int) onFxThread(ui::writtenSoFar), "a sor nem irta ki magat");
     }
 }

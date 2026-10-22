@@ -281,8 +281,9 @@ public class GameUI {
     private Timeline typing;
     private boolean typingActive = false;
 
-    /** When the last Enter / click was acted on, for the burst guard. */
+    /** When the last Enter / click was acted on, and when the line now on screen arrived. */
     private long lastAdvance = 0;
+    private long appearedAt = 0;
     private String fullText = "";
 
     private boolean dialogueShown = false;
@@ -1042,7 +1043,7 @@ public class GameUI {
 
         stagePane.setOnMouseClicked(e -> {
             if (itemActive) {
-                skipItem();
+                pressEnterButton();
             }
         });
 
@@ -1228,6 +1229,7 @@ public class GameUI {
         typing.setOnFinished(e -> finishTyping());
 
         typingActive = true;
+        appearedAt = System.nanoTime();
         Sound.get().typingStarted();
         typing.play();
     }
@@ -2042,22 +2044,45 @@ public class GameUI {
         pressEnterButton();
     }
 
-    /** Enter: finishes the typewriter first, then continues. */
-    public void pressEnterButton() {
+    /**
+     * A press that cannot be a reader's decision.
+     *
+     * Two kinds get here. Pressed together: while the UI thread is held up -
+     * a save, a track being decoded - everything pressed meanwhile is handed
+     * over at once, and a held key repeats about every 33ms. Pressed at the
+     * wrong screen: the key that dismissed the legal card, or the click that
+     * took a choice, is still on its way when the next line starts typing, and
+     * it finishes the line nobody has read yet. That is the one testers keep
+     * reporting, and it is why the window runs from the line appearing rather
+     * than from the press before it.
+     */
+    private boolean leftoverPress() {
 
-        // Two of these cannot be a hand's work if they arrive together. When the
-        // UI thread is held up - a save, a track being decoded - everything that
-        // was pressed meanwhile is handed over at once, and the pair reads as
-        // "finish the line" plus "take the choice" in the same instant: the line
-        // the player was reading is gone and the choices are up. A held-down key
-        // repeats about every 33ms, which this throttles for the same reason.
         long now = System.nanoTime();
 
-        if (now - lastAdvance < 100_000_000L) {
-            return;
+        if (now - appearedAt < 350_000_000L || now - lastAdvance < 100_000_000L) {
+            return true;
         }
 
         lastAdvance = now;
+        return false;
+    }
+
+    /**
+     * Something else just took the screen - a sheet closing, a card dismissed.
+     * The key that closed it is still on its way, so the line underneath gets
+     * the same grace a fresh one does.
+     */
+    void screenChanged() {
+        appearedAt = System.nanoTime();
+    }
+
+    /** Enter: finishes the typewriter first, then continues. */
+    public void pressEnterButton() {
+
+        if (leftoverPress()) {
+            return;
+        }
 
         if (exposedCard.isVisible()) {
             return;
@@ -2607,6 +2632,7 @@ public class GameUI {
 
         itemActive = true;
         itemDone = onDone;
+        appearedAt = System.nanoTime();
 
         overlayWasVisible = overlay.isVisible();
         characterWasVisible = characterView.isVisible();

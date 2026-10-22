@@ -151,9 +151,12 @@ class ResumeSmokeTest {
 
         // Two presses forward: the first finishes the typewriter, the second is
         // the click that moves the scene on - the same as playing it, hand speed
-        // included. Pressed any closer together the game treats the pair as one
-        // stalled burst and ignores the second, which is what keeps a held key
-        // from skipping the line before a choice.
+        // included. The waits are the point rather than slack: a line that has
+        // just appeared ignores a press for a moment, because that press was
+        // aimed at whatever was on screen before it, and two presses arriving
+        // together are a stalled thread handing over its queue.
+        Thread.sleep(400);
+
         for (int i = 0; i < 2; i++) {
             onFxThread(() -> {
                 controller.getUI().pressEnterButton();

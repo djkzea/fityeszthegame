@@ -339,6 +339,9 @@ public class HelloApplication extends Application {
         out.setOnFinished(e -> {
             setPauseShown(false);
             paused = false;
+
+            // the Enter that picked RESUME must not also finish the line below
+            controller.getUI().screenChanged();
         });
         out.play();
     }
