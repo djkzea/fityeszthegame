@@ -284,6 +284,17 @@ public class GameUI {
     /** When the last Enter / click was acted on, and when the line now on screen arrived. */
     private long lastAdvance = 0;
     private long appearedAt = 0;
+
+    /**
+     * The lines of this scene that have not been read yet.
+     *
+     * A scene that says four things used to say them all in the same breath,
+     * each one writing over the line being typed, so the player saw only the
+     * last of them: the text before a question simply vanished. They queue up
+     * now and come one press at a time.
+     */
+    private final java.util.ArrayDeque<String[]> waitingLines = new java.util.ArrayDeque<>();
+    private boolean lineOnScreen = false;
     private String fullText = "";
 
     private boolean dialogueShown = false;
@@ -1163,6 +1174,31 @@ public class GameUI {
         String sp = speaker == null ? "" : speaker.trim();
         String tx = text == null ? "" : text;
 
+        // the first line of the scene goes up; the rest wait their turn
+        if (lineOnScreen) {
+            waitingLines.add(new String[]{sp, tx});
+            hintLabel.setText(Lang.t("ui.enter"));
+            titleHint.setText(Lang.t("ui.enter"));
+            refreshLayout();
+            return;
+        }
+
+        lineOnScreen = true;
+        display(sp, tx);
+    }
+
+    /** The next line of the scene, when the player asks for it. */
+    private void showWaitingLine() {
+
+        String[] next = waitingLines.poll();
+
+        if (next != null) {
+            display(next[0], next[1]);
+        }
+    }
+
+    private void display(String sp, String tx) {
+
         hideSummaryCard();
 
         // "CHAPTER" speaker = full red chapter card
@@ -1500,7 +1536,7 @@ public class GameUI {
             }
         }
 
-        boolean panel = !card && !enterMode && hasChoices && !typingActive;
+        boolean panel = !card && !enterMode && hasChoices && !typingActive && waitingLines.isEmpty();
 
         // Compact layout during boss fights so everything fits on screen
         boolean compact = bossArea.isVisible();
@@ -1514,7 +1550,7 @@ public class GameUI {
         boolean stepAside = panel && !compact;
 
         setShown(dialogueWrap, dialogueShown && !card && !stepAside);
-        setShown(hintLabel, enterMode && !card);
+        setShown(hintLabel, (enterMode || !waitingLines.isEmpty()) && !card);
         setShown(characterView, characterWanted && !card && !stepAside);
         setShown(characterTag, tagWanted && !card && !stepAside);
 
@@ -1866,6 +1902,10 @@ public class GameUI {
         enterMode = false;
         panelWasVisible = false;
 
+        // a new beat, so nothing is left over to read
+        waitingLines.clear();
+        lineOnScreen = false;
+
         choicePromptLabel.setText("");
 
         refreshLayout();
@@ -2095,6 +2135,11 @@ public class GameUI {
 
         if (typingActive) {
             finishTyping();
+            return;
+        }
+
+        if (!waitingLines.isEmpty()) {
+            showWaitingLine();
             return;
         }
 

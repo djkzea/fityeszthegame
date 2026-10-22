@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -188,5 +189,72 @@ class TypewriterTest {
         }
 
         assertEquals(full, (int) onFxThread(ui::writtenSoFar), "a sor nem irta ki magat");
+    }
+
+    /**
+     * The one the testers kept hitting: a scene that says four things used to
+     * say them over each other, so only the last was ever on screen and the
+     * text before the question was gone. Chapter 6's conversation is that
+     * scene - all four of its lines have to be readable, in order, and the
+     * choices may not arrive before the last of them.
+     */
+    @Test
+    void everyLineOfASceneCanBeRead() throws Exception {
+
+        Path home = Files.createTempDirectory("fityesz-home");
+        System.setProperty("user.home", home.toString());
+
+        try {
+            Platform.startup(() -> { });
+        } catch (IllegalStateException alreadyRunning) {
+            // another test started the toolkit first
+        }
+
+        SaveData saved = new SaveData("Zsombi", "Zsombi", 6, "kapzsConversation",
+                200, 40, 1, List.of(), List.of(), List.of(), null, null,
+                "2026-10-17T18:00:00Z");
+
+        GameController controller = onFxThread(() -> {
+            GameController c = new GameController(new Stage());
+            c.resume(saved);
+            return c;
+        });
+
+        GameUI ui = controller.getUI();
+
+        List<String> expected = List.of(
+                Lang.t("ch6.kapzs2"),
+                Lang.t("ch6.narr2"),
+                Lang.t("ch6.kapzs3", "Zsombi"),
+                Lang.t("ch6.q"));
+
+        for (int line = 0; line < expected.size(); line++) {
+
+            // let it write itself out, the way a reader would
+            int full = onFxThread(() -> ui.fullText()).length();
+
+            for (int i = 0; i < 400 && onFxThread(ui::writtenSoFar) < full; i++) {
+                Thread.sleep(25);
+            }
+
+            assertEquals(expected.get(line), onFxThread(ui::fullText),
+                    (line + 1) + ". sor nem ez: a jelenet atirta sajat magat");
+
+            if (line < expected.size() - 1) {
+                assertFalse(onFxThread(() -> ui.pressChoice(1)),
+                        "a valasztasok elobb jottek, mint a " + (line + 2) + ". sor");
+            }
+
+            Thread.sleep(200);
+
+            onFxThread(() -> {
+                ui.pressEnterButton();
+                return null;
+            });
+        }
+
+        // all four read, and only now is the question there to answer
+        assertTrue(onFxThread(() -> ui.pressChoice(1)),
+                "a negy sor utan nem lehet valaszolni");
     }
 }
