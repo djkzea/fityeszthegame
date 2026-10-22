@@ -150,12 +150,17 @@ class ResumeSmokeTest {
         assertEquals("1. FEJEZET · A TOBORZÁS", first.scenery().chapter());
 
         // Two presses forward: the first finishes the typewriter, the second is
-        // the click that moves the scene on - the same as playing it.
+        // the click that moves the scene on - the same as playing it, hand speed
+        // included. Pressed any closer together the game treats the pair as one
+        // stalled burst and ignores the second, which is what keeps a held key
+        // from skipping the line before a choice.
         for (int i = 0; i < 2; i++) {
             onFxThread(() -> {
                 controller.getUI().pressEnterButton();
                 return null;
             });
+
+            Thread.sleep(150);
         }
 
         // The autosave is written off the JavaFX thread now, so the file appears

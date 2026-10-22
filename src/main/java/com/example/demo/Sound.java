@@ -1,8 +1,6 @@
 package com.example.demo;
 
 import javafx.scene.media.AudioClip;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,7 +23,7 @@ import java.util.Properties;
  */
 public final class Sound {
 
-    private static final String MUSIC = "/com/example/demo/audio/music-loop.mp3";
+    private static final String MUSIC = "/com/example/demo/audio/music-loop.wav";
     private static final String TYPING = "/com/example/demo/audio/typing-loop.wav";
 
     /** Quiet enough to read over: the bed sits under the text, not beside it. */
@@ -36,11 +34,13 @@ public final class Sound {
 
     private final Path settings = AppDirs.data().resolve("sound.properties");
 
-    private MediaPlayer music;
-    private AudioClip typing;
+    private volatile AudioClip music;
+    private volatile AudioClip typing;
 
-    private boolean musicOn = true;
-    private boolean effectsOn = true;
+    private volatile boolean musicOn = true;
+    private volatile boolean effectsOn = true;
+
+    private boolean started = false;
 
     private Sound() {
         read();
@@ -58,32 +58,54 @@ public final class Sound {
         return effectsOn;
     }
 
-    /** Starts the bed, if the player has not turned it off. Safe to call twice. */
+    /**
+     * Starts the bed, if the player has not turned it off. Safe to call twice.
+     *
+     * Both sounds are read in on a thread of their own: decoding a track takes
+     * long enough that doing it on the UI thread stutters whatever is on screen,
+     * and the typewriter was skipping lines because of it.
+     */
     public void start() {
 
-        if (music == null) {
-            music = player(MUSIC, MUSIC_VOLUME);
+        if (started) {
+            return;
         }
 
-        if (music != null && musicOn) {
-            music.play();
+        started = true;
+
+        Thread loader = new Thread(this::load, "sound-load");
+        loader.setDaemon(true);
+        loader.start();
+    }
+
+    private void load() {
+
+        AudioClip bed = clip(MUSIC, MUSIC_VOLUME);
+        AudioClip keys = clip(TYPING, TYPING_VOLUME);
+
+        synchronized (this) {
+            music = bed;
+            typing = keys;
+
+            if (bed != null && musicOn) {
+                bed.play();
+            }
         }
     }
 
-    public void setMusic(boolean on) {
+    public synchronized void setMusic(boolean on) {
 
         musicOn = on;
         write();
 
         if (music == null) {
-            start();
-            return;
+            return;         // still loading; load() will see the new setting
         }
 
         if (on) {
             music.play();
         } else {
-            music.pause();
+            music.stop();
         }
     }
 
@@ -100,23 +122,23 @@ public final class Sound {
     /** The typewriter, for as long as a line is being typed. */
     public void typingStarted() {
 
-        if (!effectsOn) {
+        AudioClip keys = typing;
+
+        if (keys == null || !effectsOn) {
             return;
         }
 
-        if (typing == null) {
-            typing = clip(TYPING, TYPING_VOLUME);
-        }
-
-        if (typing != null && !typing.isPlaying()) {
-            typing.play();
+        if (!keys.isPlaying()) {
+            keys.play();
         }
     }
 
     public void typingStopped() {
 
-        if (typing != null && typing.isPlaying()) {
-            typing.stop();
+        AudioClip keys = typing;
+
+        if (keys != null && keys.isPlaying()) {
+            keys.stop();
         }
     }
 
@@ -124,28 +146,15 @@ public final class Sound {
     // LOADING - every failure here is silence, never a crash
     // =========================================================
 
-    private static MediaPlayer player(String resource, double volume) {
-
-        try {
-            URL url = Sound.class.getResource(resource);
-
-            if (url == null) {
-                return null;
-            }
-
-            MediaPlayer p = new MediaPlayer(new Media(playable(url, resource).toString()));
-            p.setCycleCount(MediaPlayer.INDEFINITE);
-            p.setVolume(volume);
-            p.setOnError(() -> System.err.println("sound: " + p.getError()));
-
-            return p;
-
-        } catch (RuntimeException | IOException e) {
-            System.err.println("sound: " + e.getMessage());
-            return null;
-        }
-    }
-
+    /**
+     * One decoded buffer, looped by the mixer.
+     *
+     * The bed is a plain WAV played by AudioClip rather than an mp3 through
+     * MediaPlayer on purpose: an mp3 carries encoder padding at both ends and
+     * the player seeks back to restart, which put an audible hitch in the loop
+     * every time round. AudioClip reads straight out of the jar, so nothing has
+     * to be unpacked.
+     */
     private static AudioClip clip(String resource, double volume) {
 
         try {
@@ -165,33 +174,6 @@ public final class Sound {
             System.err.println("sound: " + e.getMessage());
             return null;
         }
-    }
-
-    /**
-     * A URL the media player will accept.
-     *
-     * Media reads a URI, and inside a packaged app the resource lives in a jar,
-     * which it refuses to open - so the file is unpacked once beside the save
-     * and played from there.
-     */
-    private static URL playable(URL resource, String name) throws IOException {
-
-        if (!"jar".equals(resource.getProtocol())) {
-            return resource;
-        }
-
-        Path out = AppDirs.data().resolve("audio").resolve(name.substring(name.lastIndexOf('/') + 1));
-
-        if (!Files.isRegularFile(out)) {
-            Files.createDirectories(out.getParent());
-
-            try (InputStream in = Sound.class.getResourceAsStream(name);
-                 OutputStream to = Files.newOutputStream(out)) {
-                in.transferTo(to);
-            }
-        }
-
-        return out.toUri().toURL();
     }
 
     // =========================================================

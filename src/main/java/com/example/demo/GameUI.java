@@ -280,6 +280,9 @@ public class GameUI {
 
     private Timeline typing;
     private boolean typingActive = false;
+
+    /** When the last Enter / click was acted on, for the burst guard. */
+    private long lastAdvance = 0;
     private String fullText = "";
 
     private boolean dialogueShown = false;
@@ -1221,11 +1224,21 @@ public class GameUI {
         }));
 
         typing.setCycleCount(text.length());
+
         typing.setOnFinished(e -> finishTyping());
 
         typingActive = true;
         Sound.get().typingStarted();
         typing.play();
+    }
+
+    /** How much of the line is on screen, and how long it is. For its test. */
+    int writtenSoFar() {
+        return shownText.getText().length();
+    }
+
+    String fullText() {
+        return fullText;
     }
 
     private void stopTyping() {
@@ -2031,6 +2044,20 @@ public class GameUI {
 
     /** Enter: finishes the typewriter first, then continues. */
     public void pressEnterButton() {
+
+        // Two of these cannot be a hand's work if they arrive together. When the
+        // UI thread is held up - a save, a track being decoded - everything that
+        // was pressed meanwhile is handed over at once, and the pair reads as
+        // "finish the line" plus "take the choice" in the same instant: the line
+        // the player was reading is gone and the choices are up. A held-down key
+        // repeats about every 33ms, which this throttles for the same reason.
+        long now = System.nanoTime();
+
+        if (now - lastAdvance < 100_000_000L) {
+            return;
+        }
+
+        lastAdvance = now;
 
         if (exposedCard.isVisible()) {
             return;
