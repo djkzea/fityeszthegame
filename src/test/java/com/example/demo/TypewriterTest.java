@@ -1,6 +1,10 @@
 package com.example.demo;
 
 import javafx.application.Platform;
+import javafx.event.Event;
+import javafx.scene.Scene;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 
@@ -305,5 +309,59 @@ class TypewriterTest {
         });
 
         assertTrue(onFxThread(ui::questionIsUp), "egy nyomasra sem jott fel a kerdes");
+    }
+
+    /**
+     * The pause sheet takes the key that picks one of its items - but JavaFX
+     * passes a consumed event to the other filters on the same node anyway, so
+     * that Enter also reached the game and moved the scene on behind the sheet.
+     */
+    @Test
+    void aKeyTakenByTheMenuDoesNotAlsoMoveTheGame() throws Exception {
+
+        Path home = Files.createTempDirectory("fityesz-home");
+        System.setProperty("user.home", home.toString());
+
+        try {
+            Platform.startup(() -> { });
+        } catch (IllegalStateException alreadyRunning) {
+            // another test started the toolkit first
+        }
+
+        SaveData saved = new SaveData("Zsombi", "Zsombi", 1, "lipotiOffer",
+                30, 10, 1, List.of(), List.of(), List.of(), null, null,
+                "2026-10-17T18:00:00Z");
+
+        GameController controller = onFxThread(() -> {
+            GameController c = new GameController(new Stage());
+
+            Scene scene = new Scene(c.getUI().getRoot(), 1200, 800);
+
+            // what the pause sheet does: it claims the press first
+            scene.addEventFilter(KeyEvent.KEY_PRESSED, Event::consume);
+            c.getUI().installKeys(scene);
+
+            c.resume(saved);
+            return c;
+        });
+
+        GameUI ui = controller.getUI();
+        int full = onFxThread(() -> ui.fullText()).length();
+
+        for (int i = 0; i < 400 && onFxThread(ui::writtenSoFar) < full; i++) {
+            Thread.sleep(25);
+        }
+
+        Thread.sleep(400);
+
+        onFxThread(() -> {
+            Event.fireEvent(ui.getRoot().getScene(), new KeyEvent(
+                    KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER,
+                    false, false, false, false));
+            return null;
+        });
+
+        assertEquals("lipotiOffer", onFxThread(controller::snapshot).scene(),
+                "a menu Enter-je a jatekot is leptette");
     }
 }

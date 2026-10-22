@@ -2228,6 +2228,14 @@ public class GameUI {
 
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
 
+            // Somebody ahead of us has already taken this press. JavaFX hands a
+            // consumed event to the rest of the filters on the same node all the
+            // same, so the Enter that picked an item in the pause sheet arrived
+            // here too and moved the game on behind it.
+            if (event.isConsumed()) {
+                return;
+            }
+
             // the filter lives on the scene, but the game does not always occupy it -
             // while the title screen or a menu is up, these keys are not ours
             if (root.getScene() == null) {
