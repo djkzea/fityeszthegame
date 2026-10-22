@@ -2032,6 +2032,14 @@ public class GameUI {
         row.setId("nameRow");
         row.setUserData(field);
 
+        // the same debt a question owes: the line that asked for the name is
+        // owed a read before the row takes its place on screen
+        if (lineOnScreen && !bossArea.isVisible()) {
+            questionHeld = true;
+            hintLabel.setText(Lang.t("ui.enter"));
+            titleHint.setText(Lang.t("ui.enter"));
+        }
+
         Runnable restyle = () -> {
             boolean focused = field.isFocused();
             row.setStyle(

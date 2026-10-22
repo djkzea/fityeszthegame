@@ -311,6 +311,45 @@ class TypewriterTest {
         assertTrue(onFxThread(ui::questionIsUp), "egy nyomasra sem jott fel a kerdes");
     }
 
+    /** The opening is the longest line in the game, and the name row took it. */
+    @Test
+    void theNameRowWaitsUntilTheOpeningHasBeenRead() throws Exception {
+
+        Path home = Files.createTempDirectory("fityesz-home");
+        System.setProperty("user.home", home.toString());
+
+        try {
+            Platform.startup(() -> { });
+        } catch (IllegalStateException alreadyRunning) {
+            // another test started the toolkit first
+        }
+
+        GameController controller = onFxThread(() -> {
+            GameController c = new GameController(new Stage());
+            c.begin(1);
+            return c;
+        });
+
+        GameUI ui = controller.getUI();
+        int full = onFxThread(() -> ui.fullText()).length();
+
+        for (int i = 0; i < 600 && onFxThread(ui::writtenSoFar) < full; i++) {
+            Thread.sleep(25);
+        }
+
+        Thread.sleep(300);
+        assertEquals(full, (int) onFxThread(ui::writtenSoFar), "a nyito szoveg nem irodott ki");
+        assertFalse(onFxThread(ui::questionIsUp),
+                "a nevmezo elvette a nyito szoveg helyet, mielott elolvashattak volna");
+
+        onFxThread(() -> {
+            ui.pressEnterButton();
+            return null;
+        });
+
+        assertTrue(onFxThread(ui::questionIsUp), "egy nyomasra sem jott fel a nevmezo");
+    }
+
     /**
      * The pause sheet takes the key that picks one of its items - but JavaFX
      * passes a consumed event to the other filters on the same node anyway, so

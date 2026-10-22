@@ -1,16 +1,20 @@
 package com.example.demo;
 
-import javafx.scene.media.AudioClip;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+import javax.sound.sampled.FloatControl;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * What the game sounds like: a cue under each screen, and the typewriter.
@@ -18,6 +22,13 @@ import java.util.Properties;
  * Both are off switches as much as they are sounds - a text game is read, and
  * a player who wants silence has to get it in one press and keep it next time,
  * so the two settings live in a file beside the save.
+ *
+ * The sound comes from the JDK's own mixer rather than JavaFX's. JavaFX can
+ * either loop a clip without a seam or change its volume, never both: an
+ * AudioClip's volume is fixed once it sounds, and a MediaPlayer leaves a hole
+ * at the loop. A javax.sound Clip loops a buffer gaplessly and has a gain
+ * control that moves while it plays, which is what one cue turning into
+ * another is made of.
  *
  * Nothing here is allowed to stop the game. A missing codec, a machine with no
  * audio device, a file that will not decode: each is caught and the game plays
@@ -29,15 +40,14 @@ public final class Sound {
      * What is playing, and where it belongs.
      *
      * One bed used to run under everything. A wordmark, a menu and a page of
-     * legal text are not the same room, so each has its own cue now: the ones
-     * under a screen the player sits on loop, the ones that play over a moment
-     * do not.
+     * legal text are not the same room, so each has its own cue: the ones under
+     * a screen the player sits on loop, the ones that play over a moment do not.
      */
     public enum Track {
 
-        LOGO("/com/example/demo/audio/logo-sting.mp3", 0.55, false),
+        LOGO("/com/example/demo/audio/logo-sting.wav", 0.55, false),
         MENU("/com/example/demo/audio/menu-loop.wav", 0.38, true),
-        DISCLAIMER("/com/example/demo/audio/disclaimer.mp3", 0.42, false),
+        DISCLAIMER("/com/example/demo/audio/disclaimer.wav", 0.42, false),
         GAME("/com/example/demo/audio/music-loop.wav", 0.38, true);
 
         final String resource;
@@ -54,22 +64,58 @@ public final class Sound {
     private static final String TYPING = "/com/example/demo/audio/typing-loop.wav";
     private static final double TYPING_VOLUME = 0.30;
 
-    /**
-     * How long the cue being left runs under the one arriving.
-     *
-     * An AudioClip's volume cannot be moved while it sounds, so one cannot be
-     * faded into the other. They overlap for a moment instead, which reads as a
-     * dissolve - and every switch happens under a curtain or a card fading
-     * anyway.
-     */
-    private static final long HANDOVER_MS = 350;
+    /** How long one cue takes to become another. */
+    private static final int FADE_MS = 900;
+    private static final int STEP_MS = 20;
+
+    /** Quiet enough to be gone, loud enough that the mixer does not round it away. */
+    private static final float SILENT_DB = -60f;
+
+    private static final AtomicLong TOKENS = new AtomicLong();
 
     private static final Sound INSTANCE = new Sound();
 
+    /** One loaded sound: the buffer, the knob that moves its level, and where it sits. */
+    private static final class Cue {
+
+        private final Clip clip;
+        private final FloatControl gain;
+        private final float levelDb;
+
+        /** The only fade allowed to touch this cue; a newer one takes over. */
+        private volatile long fade;
+
+        Cue(Clip clip, FloatControl gain, float levelDb) {
+            this.clip = clip;
+            this.gain = gain;
+            this.levelDb = levelDb;
+        }
+
+        void setDb(float db) {
+            if (gain != null) {
+                gain.setValue(Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), db)));
+            }
+        }
+
+        float db() {
+            return gain == null ? levelDb : gain.getValue();
+        }
+
+        void from(boolean loops) {
+            clip.setFramePosition(0);
+
+            if (loops) {
+                clip.loop(Clip.LOOP_CONTINUOUSLY);
+            } else {
+                clip.start();
+            }
+        }
+    }
+
     private final Path settings = AppDirs.data().resolve("sound.properties");
 
-    private volatile Map<Track, AudioClip> music = Map.of();
-    private volatile AudioClip typing;
+    private volatile Map<Track, Cue> cues = Map.of();
+    private volatile Cue typing;
 
     private volatile Track current = Track.LOGO;
 
@@ -116,31 +162,36 @@ public final class Sound {
 
     private void load() {
 
-        EnumMap<Track, AudioClip> loaded = new EnumMap<>(Track.class);
+        EnumMap<Track, Cue> loaded = new EnumMap<>(Track.class);
 
         for (Track track : Track.values()) {
-            AudioClip c = clip(track.resource, track.volume, track.loops);
+            Cue cue = open(track.resource, track.volume);
 
-            if (c != null) {
-                loaded.put(track, c);
+            if (cue != null) {
+                loaded.put(track, cue);
             }
         }
 
-        AudioClip keys = clip(TYPING, TYPING_VOLUME, true);
+        Cue keys = open(TYPING, TYPING_VOLUME);
 
         synchronized (this) {
-            music = loaded;
+            cues = loaded;
             typing = keys;
 
-            AudioClip now = loaded.get(current);
+            Cue now = loaded.get(current);
 
             if (musicOn && now != null) {
-                now.play();
+                rise(now, current.loops);
             }
         }
     }
 
-    /** Puts on the cue that belongs to the screen the player is looking at. */
+    /**
+     * Puts on the cue that belongs to the screen the player is looking at.
+     *
+     * The two overlap while one gives way to the other, so a switch is a change
+     * of room rather than a cut.
+     */
     public synchronized void play(Track track) {
 
         if (track == current) {
@@ -150,41 +201,20 @@ public final class Sound {
         Track leaving = current;
         current = track;
 
-        if (musicOn) {
-            handover(leaving, track);
-        }
-    }
-
-    private void handover(Track leaving, Track arriving) {
-
-        AudioClip out = music.get(leaving);
-        AudioClip in = music.get(arriving);
-
-        if (in != null) {
-            in.play();
+        if (!musicOn) {
+            return;         // remembered; it starts if the music is switched on
         }
 
-        if (out == null) {
-            return;
+        Cue arriving = cues.get(track);
+        Cue going = cues.get(leaving);
+
+        if (arriving != null) {
+            rise(arriving, track.loops);
         }
 
-        Thread tail = new Thread(() -> {
-
-            try {
-                Thread.sleep(HANDOVER_MS);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            }
-
-            // unless the player has gone back to it in the meantime
-            if (current != leaving) {
-                out.stop();
-            }
-
-        }, "sound-handover");
-
-        tail.setDaemon(true);
-        tail.start();
+        if (going != null) {
+            fade(going, going.db(), SILENT_DB, true);
+        }
     }
 
     public synchronized void setMusic(boolean on) {
@@ -192,16 +222,16 @@ public final class Sound {
         musicOn = on;
         write();
 
-        AudioClip now = music.get(current);
+        Cue now = cues.get(current);
 
         if (now == null) {
             return;         // still loading; load() will see the new setting
         }
 
         if (on) {
-            now.play();
+            rise(now, current.loops);
         } else {
-            music.values().forEach(AudioClip::stop);
+            cues.values().forEach(cue -> fade(cue, cue.db(), SILENT_DB, true));
         }
     }
 
@@ -218,24 +248,96 @@ public final class Sound {
     /** The typewriter, for as long as a line is being typed. */
     public void typingStarted() {
 
-        AudioClip keys = typing;
+        Cue keys = typing;
 
         if (keys == null || !effectsOn) {
             return;
         }
 
-        if (!keys.isPlaying()) {
-            keys.play();
+        if (!keys.clip.isRunning()) {
+            keys.from(true);
         }
     }
 
     public void typingStopped() {
 
-        AudioClip keys = typing;
+        Cue keys = typing;
 
-        if (keys != null && keys.isPlaying()) {
-            keys.stop();
+        if (keys != null && keys.clip.isRunning()) {
+            keys.clip.stop();
         }
+    }
+
+    // =========================================================
+    // WHAT THE MIXER IS DOING - read back by the fade's test
+    // =========================================================
+
+    /** True once the files are in the mixer; false on a machine with no audio. */
+    boolean ready() {
+        return !cues.isEmpty();
+    }
+
+    /** The level this cue is at right now, in dB. */
+    float levelOf(Track track) {
+        Cue cue = cues.get(track);
+        return cue == null ? SILENT_DB : cue.db();
+    }
+
+    boolean sounding(Track track) {
+        Cue cue = cues.get(track);
+        return cue != null && cue.clip.isRunning();
+    }
+
+    // =========================================================
+    // ONE CUE BECOMING ANOTHER
+    // =========================================================
+
+    /** Starts a cue from silence and brings it up to its own level. */
+    private void rise(Cue cue, boolean loops) {
+
+        float from = cue.clip.isRunning() ? cue.db() : SILENT_DB;
+
+        if (!cue.clip.isRunning()) {
+            cue.setDb(SILENT_DB);
+            cue.from(loops);
+        }
+
+        fade(cue, from, cue.levelDb, false);
+    }
+
+    private void fade(Cue cue, float fromDb, float toDb, boolean stopAtEnd) {
+
+        long token = TOKENS.incrementAndGet();
+        cue.fade = token;
+
+        Thread fader = new Thread(() -> {
+
+            int steps = FADE_MS / STEP_MS;
+
+            for (int i = 0; i <= steps; i++) {
+
+                if (cue.fade != token) {
+                    return;         // a newer fade owns this cue now
+                }
+
+                cue.setDb(fromDb + (toDb - fromDb) * i / steps);
+
+                try {
+                    Thread.sleep(STEP_MS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+
+            if (stopAtEnd && cue.fade == token) {
+                cue.clip.stop();
+            }
+
+        }, "sound-fade");
+
+        fader.setDaemon(true);
+        fader.start();
     }
 
     // =========================================================
@@ -243,36 +345,38 @@ public final class Sound {
     // =========================================================
 
     /**
-     * One decoded buffer, looped by the mixer.
+     * One WAV read into the mixer.
      *
-     * A cue that loops is a plain WAV played by AudioClip rather than an mp3
-     * through MediaPlayer on purpose: an mp3 carries encoder padding at both
-     * ends and the player seeks back to restart, which put an audible hitch in
-     * the loop every time round. The ones that play once are mp3s, since there
-     * is no seam to protect and they are a tenth of the size. AudioClip reads
-     * either straight out of the jar, so nothing has to be unpacked.
+     * The whole file is held as sound rather than streamed: a Clip loops its
+     * buffer without a seam, which is the point of it, and the largest of these
+     * is a few megabytes. Compressed formats are not read here - the JDK mixer
+     * takes PCM - so every cue ships as a WAV.
      */
-    private static AudioClip clip(String resource, double volume, boolean loops) {
+    private static Cue open(String resource, double volume) {
 
-        try {
-            URL url = Sound.class.getResource(resource);
+        try (InputStream raw = Sound.class.getResourceAsStream(resource)) {
 
-            if (url == null) {
+            if (raw == null) {
                 return null;
             }
 
-            AudioClip c = new AudioClip(url.toExternalForm());
+            try (AudioInputStream in = AudioSystem.getAudioInputStream(new BufferedInputStream(raw))) {
 
-            if (loops) {
-                c.setCycleCount(AudioClip.INDEFINITE);
+                Clip clip = AudioSystem.getClip();
+                clip.open(in);
+
+                FloatControl gain = clip.isControlSupported(FloatControl.Type.MASTER_GAIN)
+                        ? (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN)
+                        : null;
+
+                Cue cue = new Cue(clip, gain, (float) (20 * Math.log10(volume)));
+                cue.setDb(cue.levelDb);
+
+                return cue;
             }
 
-            c.setVolume(volume);
-
-            return c;
-
-        } catch (RuntimeException e) {
-            System.err.println("sound: " + e.getMessage());
+        } catch (Exception noSound) {
+            System.err.println("sound: " + noSound.getMessage());
             return null;
         }
     }

@@ -1,6 +1,5 @@
 module com.example.demo {
     requires javafx.controls;
-    requires javafx.media;
     requires javafx.fxml;
     requires com.fasterxml.jackson.databind;
     requires java.net.http;
