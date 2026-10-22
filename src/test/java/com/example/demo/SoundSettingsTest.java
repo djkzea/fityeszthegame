@@ -9,6 +9,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -19,6 +20,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * singing again.
  */
 class SoundSettingsTest {
+
+    /** A cue whose file is missing is silence, and silence is hard to notice. */
+    @Test
+    void everyCueHasItsFile() {
+        for (Sound.Track track : Sound.Track.values()) {
+            assertNotNull(Sound.class.getResource(track.resource),
+                    "nincs meg a hangfajl: " + track + " -> " + track.resource);
+        }
+    }
 
     @Test
     void bothAreOnBeforeAnybodySaysOtherwise(@TempDir Path dir) {

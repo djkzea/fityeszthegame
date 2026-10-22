@@ -403,6 +403,9 @@ public class HelloApplication extends Application {
 
         fall.setOnFinished(e -> showDisclaimer(() -> {
 
+            // the card is done; the story's own bed comes up behind the curtain
+            Sound.get().play(Sound.Track.GAME);
+
             shell.getChildren().set(0, controller.getUI().getRoot());
 
             // started as the curtain lifts, so the first line is already typing
@@ -428,6 +431,10 @@ public class HelloApplication extends Application {
 
     /** The film-style card, held on the ink before the story starts. */
     private void showDisclaimer(Runnable done) {
+
+        // its own cue: the menu's theme under a page of legal text would be
+        // the wrong room, and the card is the beat before the story starts
+        Sound.get().play(Sound.Track.DISCLAIMER);
 
         Label text = new Label(Lang.magyar() ? DISCLAIMER_HU : DISCLAIMER_EN);
 

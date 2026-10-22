@@ -8,10 +8,12 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
- * What the game sounds like: a bed under the story and the typewriter.
+ * What the game sounds like: a cue under each screen, and the typewriter.
  *
  * Both are off switches as much as they are sounds - a text game is read, and
  * a player who wants silence has to get it in one press and keep it next time,
@@ -23,19 +25,53 @@ import java.util.Properties;
  */
 public final class Sound {
 
-    private static final String MUSIC = "/com/example/demo/audio/music-loop.wav";
-    private static final String TYPING = "/com/example/demo/audio/typing-loop.wav";
+    /**
+     * What is playing, and where it belongs.
+     *
+     * One bed used to run under everything. A wordmark, a menu and a page of
+     * legal text are not the same room, so each has its own cue now: the ones
+     * under a screen the player sits on loop, the ones that play over a moment
+     * do not.
+     */
+    public enum Track {
 
-    /** Quiet enough to read over: the bed sits under the text, not beside it. */
-    private static final double MUSIC_VOLUME = 0.38;
+        LOGO("/com/example/demo/audio/logo-sting.mp3", 0.55, false),
+        MENU("/com/example/demo/audio/menu-loop.wav", 0.38, true),
+        DISCLAIMER("/com/example/demo/audio/disclaimer.mp3", 0.42, false),
+        GAME("/com/example/demo/audio/music-loop.wav", 0.38, true);
+
+        final String resource;
+        private final double volume;
+        private final boolean loops;
+
+        Track(String resource, double volume, boolean loops) {
+            this.resource = resource;
+            this.volume = volume;
+            this.loops = loops;
+        }
+    }
+
+    private static final String TYPING = "/com/example/demo/audio/typing-loop.wav";
     private static final double TYPING_VOLUME = 0.30;
+
+    /**
+     * How long the cue being left runs under the one arriving.
+     *
+     * An AudioClip's volume cannot be moved while it sounds, so one cannot be
+     * faded into the other. They overlap for a moment instead, which reads as a
+     * dissolve - and every switch happens under a curtain or a card fading
+     * anyway.
+     */
+    private static final long HANDOVER_MS = 350;
 
     private static final Sound INSTANCE = new Sound();
 
     private final Path settings = AppDirs.data().resolve("sound.properties");
 
-    private volatile AudioClip music;
+    private volatile Map<Track, AudioClip> music = Map.of();
     private volatile AudioClip typing;
+
+    private volatile Track current = Track.LOGO;
 
     private volatile boolean musicOn = true;
     private volatile boolean effectsOn = true;
@@ -59,11 +95,11 @@ public final class Sound {
     }
 
     /**
-     * Starts the bed, if the player has not turned it off. Safe to call twice.
+     * Reads the sounds in and starts the opening cue. Safe to call twice.
      *
-     * Both sounds are read in on a thread of their own: decoding a track takes
-     * long enough that doing it on the UI thread stutters whatever is on screen,
-     * and the typewriter was skipping lines because of it.
+     * It all happens on a thread of its own: decoding a track takes long enough
+     * that doing it on the UI thread stutters whatever is on screen, and the
+     * typewriter was skipping lines because of it.
      */
     public void start() {
 
@@ -80,17 +116,75 @@ public final class Sound {
 
     private void load() {
 
-        AudioClip bed = clip(MUSIC, MUSIC_VOLUME);
-        AudioClip keys = clip(TYPING, TYPING_VOLUME);
+        EnumMap<Track, AudioClip> loaded = new EnumMap<>(Track.class);
 
-        synchronized (this) {
-            music = bed;
-            typing = keys;
+        for (Track track : Track.values()) {
+            AudioClip c = clip(track.resource, track.volume, track.loops);
 
-            if (bed != null && musicOn) {
-                bed.play();
+            if (c != null) {
+                loaded.put(track, c);
             }
         }
+
+        AudioClip keys = clip(TYPING, TYPING_VOLUME, true);
+
+        synchronized (this) {
+            music = loaded;
+            typing = keys;
+
+            AudioClip now = loaded.get(current);
+
+            if (musicOn && now != null) {
+                now.play();
+            }
+        }
+    }
+
+    /** Puts on the cue that belongs to the screen the player is looking at. */
+    public synchronized void play(Track track) {
+
+        if (track == current) {
+            return;
+        }
+
+        Track leaving = current;
+        current = track;
+
+        if (musicOn) {
+            handover(leaving, track);
+        }
+    }
+
+    private void handover(Track leaving, Track arriving) {
+
+        AudioClip out = music.get(leaving);
+        AudioClip in = music.get(arriving);
+
+        if (in != null) {
+            in.play();
+        }
+
+        if (out == null) {
+            return;
+        }
+
+        Thread tail = new Thread(() -> {
+
+            try {
+                Thread.sleep(HANDOVER_MS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+
+            // unless the player has gone back to it in the meantime
+            if (current != leaving) {
+                out.stop();
+            }
+
+        }, "sound-handover");
+
+        tail.setDaemon(true);
+        tail.start();
     }
 
     public synchronized void setMusic(boolean on) {
@@ -98,14 +192,16 @@ public final class Sound {
         musicOn = on;
         write();
 
-        if (music == null) {
+        AudioClip now = music.get(current);
+
+        if (now == null) {
             return;         // still loading; load() will see the new setting
         }
 
         if (on) {
-            music.play();
+            now.play();
         } else {
-            music.stop();
+            music.values().forEach(AudioClip::stop);
         }
     }
 
@@ -149,13 +245,14 @@ public final class Sound {
     /**
      * One decoded buffer, looped by the mixer.
      *
-     * The bed is a plain WAV played by AudioClip rather than an mp3 through
-     * MediaPlayer on purpose: an mp3 carries encoder padding at both ends and
-     * the player seeks back to restart, which put an audible hitch in the loop
-     * every time round. AudioClip reads straight out of the jar, so nothing has
-     * to be unpacked.
+     * A cue that loops is a plain WAV played by AudioClip rather than an mp3
+     * through MediaPlayer on purpose: an mp3 carries encoder padding at both
+     * ends and the player seeks back to restart, which put an audible hitch in
+     * the loop every time round. The ones that play once are mp3s, since there
+     * is no seam to protect and they are a tenth of the size. AudioClip reads
+     * either straight out of the jar, so nothing has to be unpacked.
      */
-    private static AudioClip clip(String resource, double volume) {
+    private static AudioClip clip(String resource, double volume, boolean loops) {
 
         try {
             URL url = Sound.class.getResource(resource);
@@ -165,7 +262,11 @@ public final class Sound {
             }
 
             AudioClip c = new AudioClip(url.toExternalForm());
-            c.setCycleCount(AudioClip.INDEFINITE);
+
+            if (loops) {
+                c.setCycleCount(AudioClip.INDEFINITE);
+            }
+
             c.setVolume(volume);
 
             return c;

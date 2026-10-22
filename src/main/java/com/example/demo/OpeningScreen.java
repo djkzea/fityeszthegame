@@ -188,6 +188,7 @@ public class OpeningScreen {
     public void showPosterNow() {
 
         splashDone = true;
+        Sound.get().play(Sound.Track.MENU);
         splash.setVisible(false);
         splash.setOpacity(0);
 
@@ -793,6 +794,9 @@ public class OpeningScreen {
             return;
         }
         splashDone = true;
+
+        // the wordmark's sting has had its moment; the menu has its own cue
+        Sound.get().play(Sound.Track.MENU);
 
         FadeTransition splashOut = new FadeTransition(Duration.seconds(0.6), splash);
         splashOut.setFromValue(splash.getOpacity());
