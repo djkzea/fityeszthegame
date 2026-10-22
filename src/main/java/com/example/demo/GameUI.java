@@ -295,6 +295,17 @@ public class GameUI {
      */
     private final java.util.ArrayDeque<String[]> waitingLines = new java.util.ArrayDeque<>();
     private boolean lineOnScreen = false;
+
+    /**
+     * A question that is ready but has not been asked yet.
+     *
+     * The choices panel takes the screen from the dialogue box - that is the
+     * design, the scene steps aside for a question. But it used to do it the
+     * instant the line finished typing, so the last thing said before a
+     * question was readable only while it was being written, and then it was
+     * gone. The player called that skipping, and they were right.
+     */
+    private boolean questionHeld = false;
     private String fullText = "";
 
     private boolean dialogueShown = false;
@@ -1536,7 +1547,8 @@ public class GameUI {
             }
         }
 
-        boolean panel = !card && !enterMode && hasChoices && !typingActive && waitingLines.isEmpty();
+        boolean panel = !card && !enterMode && hasChoices && !typingActive
+                && waitingLines.isEmpty() && !questionHeld;
 
         // Compact layout during boss fights so everything fits on screen
         boolean compact = bossArea.isVisible();
@@ -1550,7 +1562,7 @@ public class GameUI {
         boolean stepAside = panel && !compact;
 
         setShown(dialogueWrap, dialogueShown && !card && !stepAside);
-        setShown(hintLabel, (enterMode || !waitingLines.isEmpty()) && !card);
+        setShown(hintLabel, (enterMode || !waitingLines.isEmpty() || questionHeld) && !card);
         setShown(characterView, characterWanted && !card && !stepAside);
         setShown(characterTag, tagWanted && !card && !stepAside);
 
@@ -1905,6 +1917,7 @@ public class GameUI {
         // a new beat, so nothing is left over to read
         waitingLines.clear();
         lineOnScreen = false;
+        questionHeld = false;
 
         choicePromptLabel.setText("");
 
@@ -1958,6 +1971,15 @@ public class GameUI {
 
         button.setOnMouseEntered(e -> styleChoice(button, numberBox, true));
         button.setOnMouseExited(e -> styleChoice(button, numberBox, false));
+
+        // In a fight the dialogue stays put beside the choices, so the round can
+        // go on without an extra press; everywhere else the question would take
+        // the line's place, and the line is owed a read first.
+        if (lineOnScreen && !bossArea.isVisible()) {
+            questionHeld = true;
+            hintLabel.setText(Lang.t("ui.enter"));
+            titleHint.setText(Lang.t("ui.enter"));
+        }
 
         choicesBox.getChildren().add(button);
         refreshLayout();
@@ -2143,6 +2165,13 @@ public class GameUI {
             return;
         }
 
+        if (questionHeld) {
+            questionHeld = false;
+            appearedAt = System.nanoTime();     // the question is what just arrived
+            refreshLayout();
+            return;
+        }
+
         for (Node node : choicesBox.getChildren()) {
             if (node instanceof Button button && "enterButton".equals(button.getId())) {
                 button.fire();
@@ -2152,6 +2181,11 @@ public class GameUI {
     }
 
     /** Keys 1-9: picks the n-th visible choice. Returns true if a choice was fired. */
+    /** Whether the question is on screen and could be answered. For its test. */
+    boolean questionIsUp() {
+        return choicesPanel.isVisible();
+    }
+
     public boolean pressChoice(int n) {
 
         if (itemActive || exposedCard.isVisible() || !choicesPanel.isVisible()) {

@@ -257,4 +257,53 @@ class TypewriterTest {
         assertTrue(onFxThread(() -> ui.pressChoice(1)),
                 "a negy sor utan nem lehet valaszolni");
     }
+
+    /**
+     * The scene steps aside for a question - no dialogue box behind the
+     * choices. It used to do that the moment the line stopped typing, so the
+     * last thing said before a question could only be read while it was being
+     * written. The question waits for a press now.
+     */
+    @Test
+    void theQuestionWaitsUntilTheLineHasBeenRead() throws Exception {
+
+        Path home = Files.createTempDirectory("fityesz-home");
+        System.setProperty("user.home", home.toString());
+
+        try {
+            Platform.startup(() -> { });
+        } catch (IllegalStateException alreadyRunning) {
+            // another test started the toolkit first
+        }
+
+        SaveData saved = new SaveData("Zsombi", "Zsombi", 2, "lakatosChoice",
+                80, 20, 1, List.of(), List.of(), List.of(), null, null,
+                "2026-10-17T18:00:00Z");
+
+        GameController controller = onFxThread(() -> {
+            GameController c = new GameController(new Stage());
+            c.resume(saved);
+            return c;
+        });
+
+        GameUI ui = controller.getUI();
+        int full = onFxThread(() -> ui.fullText()).length();
+
+        for (int i = 0; i < 400 && onFxThread(ui::writtenSoFar) < full; i++) {
+            Thread.sleep(25);
+        }
+
+        // written out, and still on screen: the question has not taken its place
+        Thread.sleep(300);
+        assertFalse(onFxThread(ui::questionIsUp),
+                "a kerdes elvette a sor helyet, mielott elolvashattak volna");
+        assertEquals(full, (int) onFxThread(ui::writtenSoFar));
+
+        onFxThread(() -> {
+            ui.pressEnterButton();
+            return null;
+        });
+
+        assertTrue(onFxThread(ui::questionIsUp), "egy nyomasra sem jott fel a kerdes");
+    }
 }
