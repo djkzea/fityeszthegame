@@ -43,3 +43,6 @@ src/main/resources/com/example/demo/supabase.properties
 .playwright-mcp/
 packaging/win/overrides.wxi
 packaging/win/main.wxs
+
+# a Supabase CLI munkafájljai
+supabase/.temp/

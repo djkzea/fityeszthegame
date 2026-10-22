@@ -1205,6 +1205,7 @@ public class GameUI {
             shownText.setText("");
             pendingText.setText("");
             typingActive = false;
+            Sound.get().typingStopped();
             return;
         }
 
@@ -1223,6 +1224,7 @@ public class GameUI {
         typing.setOnFinished(e -> finishTyping());
 
         typingActive = true;
+        Sound.get().typingStarted();
         typing.play();
     }
 
@@ -1232,6 +1234,7 @@ public class GameUI {
             typing = null;
         }
         typingActive = false;
+        Sound.get().typingStopped();
     }
 
     private void finishTyping() {
@@ -1244,6 +1247,7 @@ public class GameUI {
         shownText.setText(fullText);
         pendingText.setText("");
         typingActive = false;
+        Sound.get().typingStopped();
 
         refreshLayout();
     }

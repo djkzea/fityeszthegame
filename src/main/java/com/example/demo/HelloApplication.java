@@ -67,6 +67,10 @@ public class HelloApplication extends Application {
 
     /** Held so its own label can report the save - the lambda refers to it. */
     private Button pauseSave;
+
+    /** The two sound switches, held so each can rewrite its own label. */
+    private Button pauseMusic;
+    private Button pauseSounds;
     private int pauseIndex = 0;
 
     @Override
@@ -103,6 +107,8 @@ public class HelloApplication extends Application {
                 e.consume();
             }
         });
+
+        Sound.get().start();
 
         stage.setTitle("The Fityesz Chronicle");
         stage.setMinWidth(900);
@@ -232,6 +238,20 @@ public class HelloApplication extends Application {
             pauseSave.setText(Lang.t("ui.saved").toUpperCase());
         });
 
+        // Two switches rather than one: the bed and the typewriter annoy
+        // different people, and a text game is read - silence has to be one press away.
+        pauseMusic = pauseItem("", () -> {
+            Sound.get().setMusic(!Sound.get().musicOn());
+            pauseMusic.setText(switchLabel("ui.music", Sound.get().musicOn()));
+        });
+        pauseMusic.setText(switchLabel("ui.music", Sound.get().musicOn()));
+
+        pauseSounds = pauseItem("", () -> {
+            Sound.get().setEffects(!Sound.get().effectsOn());
+            pauseSounds.setText(switchLabel("ui.sounds", Sound.get().effectsOn()));
+        });
+        pauseSounds.setText(switchLabel("ui.sounds", Sound.get().effectsOn()));
+
         Button log = pauseItem(Lang.t("ui.log"), () -> {
             resume();
             controller.getUI().showLog(controller.chatlog().entries());
@@ -240,7 +260,7 @@ public class HelloApplication extends Application {
         Button menu = pauseItem(hu ? "Főmenü" : "Main menu", this::toTitle);
         Button quit = pauseItem(Lang.t("ui.exit"), () -> dip(Platform::exit, 420));
 
-        VBox items = new VBox(2, resume, pauseSave, log, menu, quit);
+        VBox items = new VBox(2, resume, pauseSave, log, pauseMusic, pauseSounds, menu, quit);
         items.setPadding(new Insets(18, 0, 0, 0));
 
         VBox sheet = new VBox(heading, items);
@@ -259,6 +279,11 @@ public class HelloApplication extends Application {
         in.setFromValue(0);
         in.setToValue(1);
         in.play();
+    }
+
+    /** "ZENE · BE" - the setting reads as part of the menu line. */
+    private static String switchLabel(String key, boolean on) {
+        return Lang.t(key) + " · " + Lang.t(on ? "ui.on" : "ui.off").toUpperCase();
     }
 
     private Button pauseItem(String text, Runnable action) {

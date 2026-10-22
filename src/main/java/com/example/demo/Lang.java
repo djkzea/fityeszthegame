@@ -139,6 +139,10 @@ public final class Lang {
                                  "Your run is kept in your account, and you can carry on with it on the website.");
         p("ui.escBack",          "ESC VISSZA", "ESC GOES BACK");
         p("ui.escClose",         "ESC BEZÁR", "ESC CLOSES");
+        p("ui.music",            "Zene", "Music");
+        p("ui.sounds",           "Hangok", "Sound effects");
+        p("ui.on",               "be", "on");
+        p("ui.off",              "ki", "off");
         p("ui.logEntries",       "bejegyzés", "entries");
         p("ui.logIn",            "Bejelentkezés", "Log In");
         p("ui.signUp",           "Regisztráció", "Sign Up");
