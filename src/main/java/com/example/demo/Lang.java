@@ -113,7 +113,8 @@ public final class Lang {
         p("ui.log",              "Napló", "Log");
         p("ui.username",         "Felhasználónév", "Username");
         p("ui.usernameOrEmail",  "Felhasználónév vagy e-mail", "Username or e-mail");
-        p("ui.authFailed",       "Hibás belépési adatok.", "Those sign-in details are not right.");
+        p("ui.authFailed",       "Hibás belépési adatok. Ha most regisztráltál, előbb erősítsd meg az e-mail-címed a levélben.",
+                                 "Those sign-in details are not right. If you have just registered, confirm your address from the e-mail first.");
         p("ui.authOffline",      "Nincs kapcsolat a kiszolgálóval.", "The server cannot be reached.");
         p("ui.authNoUsernames",  "Felhasználónévvel most nem lehet belépni, próbáld az e-mail-címeddel.",
                                  "Signing in by username is unavailable right now - try your e-mail address.");
