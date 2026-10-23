@@ -107,6 +107,13 @@ public final class Lang {
         p("ui.newGame",          "Új játék", "New Game");
         p("ui.loadGame",         "Játék betöltése", "Load Game");
         p("ui.exit",             "Kilépés", "Exit");
+        p("ui.crew",             "Alkotók", "Creators");
+        p("crew.made",           "A Fityesz Krónikát készítette", "The Fityesz Chronicle was made by");
+        p("crew.name1",          "Kukucska Zsombor", "Zsombor Kukucska");
+        p("crew.name2",          "Dajka Zea", "Zea Dajka");
+        p("crew.role1",          "Kód · Történet", "Code · Story");
+        p("crew.role2",          "Kód · Grafika", "Code · Art");
+        p("crew.support",        "Támogatás és hírek", "Support and news");
         p("ui.signOut",          "Kilépés a fiókból", "Sign out");
         p("ui.save",             "Mentés", "Save");
         p("ui.saved",            "Mentve", "Saved");

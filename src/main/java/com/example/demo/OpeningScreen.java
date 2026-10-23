@@ -108,6 +108,10 @@ public class OpeningScreen {
 
     private Node plate;
     private Node cast;
+
+    /** The card of names after the wordmark, and whether it is up on its own. */
+    private Node crew;
+    private boolean crewOpen = false;
     private Node column;
     private Node bar;
 
@@ -533,6 +537,8 @@ public class OpeningScreen {
                     rebuild();
                 });
 
+        Button crewButton = menuButton(Lang.t("ui.crew"), true, this::showCrew);
+
         Button exit = menuButton(Lang.t("ui.exit"), true, onExit);
 
         menu.getChildren().addAll(
@@ -541,6 +547,7 @@ public class OpeningScreen {
                 menuRow(loadGame, runs.isEmpty()
                         ? Lang.t("ui.noSave").toUpperCase()
                         : (runs.size() + " " + Lang.t("ui.saves")).toUpperCase()),
+                menuRow(crewButton, "fityeszthegame.com".toUpperCase()),
                 menuRow(exit, null));
 
         nav.add(signIn);
@@ -550,6 +557,7 @@ public class OpeningScreen {
             nav.add(loadGame);
         }
 
+        nav.add(crewButton);
         nav.add(exit);
     }
 
@@ -694,8 +702,8 @@ public class OpeningScreen {
 
     private void onKey(KeyEvent e) {
 
-        // any key gets past the splash
-        if (!splashDone) {
+        // any key gets past the splash, and past the card if it was called up
+        if (!splashDone || crewOpen) {
             skipSplash();
             e.consume();
             return;
@@ -745,8 +753,88 @@ public class OpeningScreen {
         Pane logo = lockup(460);
         logo.setOpacity(0);
 
-        splash.getChildren().add(logo);
+        crew = buildCrew();
+        crew.setOpacity(0);
+
+        splash.getChildren().addAll(logo, crew);
         splash.getProperties().put("logo", logo);
+    }
+
+    /**
+     * Who made it, the way a film says so: after the wordmark, before the
+     * poster, held long enough to read and gone on any key.
+     *
+     * It is also where the support page is named - the one place in the game
+     * that asks for anything, and it asks once.
+     */
+    private Node buildCrew() {
+
+        Region rule = new Region();
+        rule.setPrefSize(54, 3);
+        rule.setMinSize(54, 3);
+        rule.setMaxSize(54, 3);
+        rule.setStyle("-fx-background-color: " + RED + ";");
+
+        Label made = new Label(spaced(Lang.t("crew.made").toUpperCase()));
+        made.setFont(Font.font(labelFont, 11));
+        made.setStyle("-fx-text-fill: " + GRAY + ";");
+
+        HBox pair = new HBox(64,
+                person("Frezzard2.png", Lang.t("crew.name1"), Lang.t("crew.role1")),
+                person("djkzea.png", Lang.t("crew.name2"), Lang.t("crew.role2")));
+        pair.setAlignment(Pos.BOTTOM_CENTER);
+
+        Label support = new Label(spaced(Lang.t("crew.support").toUpperCase()));
+        support.setFont(Font.font(labelFont, 9));
+        support.setStyle("-fx-text-fill: " + GRAY + ";");
+
+        Label site = new Label("fityeszthegame.com");
+        site.setFont(Font.font(headFont, 24));
+        site.setStyle("-fx-text-fill: " + RED + ";");
+
+        VBox box = new VBox(0, rule, made, pair, support, site);
+        box.setAlignment(Pos.CENTER);
+        box.setMouseTransparent(true);
+        VBox.setMargin(rule, new Insets(0, 0, 18, 0));
+        VBox.setMargin(pair, new Insets(26, 0, 30, 0));
+        VBox.setMargin(site, new Insets(5, 0, 0, 0));
+
+        return box;
+    }
+
+    /** One maker: the portrait, the name, what they did. */
+    private Node person(String file, String name, String role) {
+
+        VBox box = new VBox(0);
+        box.setAlignment(Pos.CENTER);
+
+        try (InputStream in = OpeningScreen.class
+                .getResourceAsStream("/com/example/demo/fityesz_art/crew/" + file)) {
+
+            if (in != null) {
+                ImageView view = new ImageView(new Image(in));
+                view.setPreserveRatio(true);
+                view.setSmooth(true);
+                view.setFitHeight(250);
+                box.getChildren().add(view);
+            }
+
+        } catch (Exception withoutAPortrait) {
+            // the names carry it on their own
+        }
+
+        Label who = new Label(name.toUpperCase());
+        who.setFont(Font.font(headFont, 26));
+        who.setStyle("-fx-text-fill: " + INK + ";");
+        VBox.setMargin(who, new Insets(14, 0, 0, 0));
+
+        Label what = new Label(spaced(role.toUpperCase()));
+        what.setFont(Font.font(labelFont, 9));
+        what.setStyle("-fx-text-fill: " + RED_TEXT + ";");
+        VBox.setMargin(what, new Insets(5, 0, 0, 0));
+
+        box.getChildren().addAll(who, what);
+        return box;
     }
 
     private void playSplash() {
@@ -772,13 +860,61 @@ public class OpeningScreen {
         out.setFromValue(1);
         out.setToValue(0);
 
-        SequentialTransition seq = new SequentialTransition(in, hold, out);
+        // then the names, the way a film puts them after the studio's mark
+        FadeTransition crewIn = new FadeTransition(Duration.seconds(0.8), crew);
+        crewIn.setFromValue(0);
+        crewIn.setToValue(1);
+
+        PauseTransition crewHold = new PauseTransition(Duration.seconds(2.2));
+
+        FadeTransition crewOut = new FadeTransition(Duration.seconds(0.7), crew);
+        crewOut.setFromValue(1);
+        crewOut.setToValue(0);
+
+        SequentialTransition seq = new SequentialTransition(in, hold, out, crewIn, crewHold, crewOut);
         seq.setOnFinished(e -> revealPoster());
         splash.getProperties().put("anim", seq);
         seq.play();
     }
 
+    /** The card again, from the menu - the support line has to stay reachable. */
+    private void showCrew() {
+
+        crewOpen = true;
+
+        Object logo = splash.getProperties().get("logo");
+
+        if (logo instanceof Node node) {
+            node.setOpacity(0);
+        }
+
+        crew.setOpacity(1);
+        splash.setOpacity(0);
+        splash.setVisible(true);
+
+        FadeTransition up = new FadeTransition(Duration.seconds(0.35), splash);
+        up.setFromValue(0);
+        up.setToValue(1);
+        up.play();
+    }
+
+    private void hideCrew() {
+
+        crewOpen = false;
+
+        FadeTransition down = new FadeTransition(Duration.seconds(0.35), splash);
+        down.setFromValue(splash.getOpacity());
+        down.setToValue(0);
+        down.setOnFinished(e -> splash.setVisible(false));
+        down.play();
+    }
+
     private void skipSplash() {
+
+        if (crewOpen) {
+            hideCrew();
+            return;
+        }
 
         Object anim = splash.getProperties().get("anim");
 
