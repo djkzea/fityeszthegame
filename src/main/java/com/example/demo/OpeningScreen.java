@@ -22,7 +22,6 @@ import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.effect.ColorAdjust;
 import javafx.scene.image.ImageView;
-import javafx.scene.shape.Circle;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
@@ -766,81 +765,132 @@ public class OpeningScreen {
      * Who made it, the way a film says so: after the wordmark, before the
      * poster, held long enough to read and gone on any key.
      *
-     * It is a card of four bands - frames from the game, the two who made it,
-     * the cast they wrote, and the address of the site. It is also the one
-     * place in the game that asks for anything, and it asks once.
+     * It is built as a poster rather than a column - the hall of the third
+     * chapter ghosted back behind everything, the five of the cast standing
+     * into the frame from both edges, and the two of us in the middle of it.
+     * It is also the one place in the game that asks for anything, and it
+     * asks once.
      */
     private Node buildCrew() {
 
-        VBox box = new VBox(0, filmstrip(), makers(), cast(), support());
-        box.setAlignment(Pos.CENTER);
-        box.setMouseTransparent(true);
+        Node column = middle();
 
-        // taller than the wordmark it replaces, so it rides the window like the menu
-        DoubleBinding fit = Bindings.createDoubleBinding(
-                () -> clamp(root.getHeight() / 940.0, 0.52, 1.08), root.heightProperty());
+        // the cast stands along the bottom, so the writing sits above their heads
+        column.translateYProperty().bind(Bindings.createDoubleBinding(
+                () -> -root.getHeight() * 0.11, root.heightProperty()));
 
-        box.scaleXProperty().bind(fit);
-        box.scaleYProperty().bind(fit);
+        StackPane card = new StackPane(backdrop(), lineup(), column);
+        card.setAlignment(Pos.CENTER);
+        card.setMouseTransparent(true);
 
-        return box;
+        // the cast leans out past the edges on purpose; the window is the frame
+        javafx.scene.shape.Rectangle frame = new javafx.scene.shape.Rectangle();
+        frame.widthProperty().bind(root.widthProperty());
+        frame.heightProperty().bind(root.heightProperty());
+        card.setClip(frame);
+
+        return card;
     }
 
-    /** Six frames out of the seven chapters, graded down so the names stay on top. */
-    private Node filmstrip() {
+    /** The hall, faded almost into the paper, so the card has a room behind it. */
+    private Node backdrop() {
 
-        String[] frames = {
-                "bg/ch1_cafe.png", "bg/ch2_hall.png", "bg/ch4_office.png",
-                "bg/ch5_corridor.png", "bg/ch6_lodge.png", "bg/ch7-2_chamber.png"
-        };
+        Image img = art("bg/ch3_hall.png", 1600);
 
-        HBox strip = new HBox(7);
-        strip.setAlignment(Pos.CENTER);
+        if (img == null) {
+            return new StackPane();
+        }
 
-        for (String file : frames) {
+        // Filled by hand rather than by CSS: an inline -fx-background-image does
+        // not reliably find a file inside a packaged jar, and this card is the
+        // first thing a packaged copy shows.
+        ImageView room = new ImageView(img);
+        room.setPreserveRatio(false);
+        room.setSmooth(true);
+        room.setOpacity(0.30);
+        room.fitWidthProperty().bind(root.widthProperty());
+        room.fitHeightProperty().bind(root.heightProperty());
 
-            Image img = art(file, 460);
+        javafx.beans.InvalidationListener cover = o -> room.setViewport(centreCrop(img,
+                Math.max(0.2, root.getWidth() / Math.max(1, root.getHeight())), 0.45));
+
+        root.widthProperty().addListener(cover);
+        root.heightProperty().addListener(cover);
+        cover.invalidated(null);
+
+        Region veil = new Region();
+        veil.setStyle("-fx-background-color: linear-gradient(to bottom, "
+                + "rgba(244,239,230,0.55) 0%, rgba(244,239,230,0.30) 45%, "
+                + "rgba(244,239,230,0.75) 100%);");
+
+        return new StackPane(room, veil);
+    }
+
+    /** The cast, standing into the frame from both edges. */
+    private Node lineup() {
+
+        HBox row = new HBox(
+                group(true, "characters/lakatoservin.png", "characters/lipoti.png"),
+                spacer(),
+                group(false, "characters/drpeterikatalin.png", "characters/kapzsimre.png"));
+
+        row.setAlignment(Pos.BOTTOM_CENTER);
+        row.setMouseTransparent(true);
+        row.setPickOnBounds(false);
+
+        return row;
+    }
+
+    private Region spacer() {
+        Region gap = new Region();
+        HBox.setHgrow(gap, Priority.ALWAYS);
+        return gap;
+    }
+
+    /**
+     * One side of the lineup. The first named stands behind and smaller, the
+     * last in front - a crowd has depth or it is a row of stickers. The frame
+     * cuts them off at the edge: it is a window, not a shelf.
+     */
+    private Node group(boolean left, String... files) {
+
+        HBox side = new HBox(-56);
+        side.setAlignment(Pos.BOTTOM_LEFT);
+
+        for (int i = 0; i < files.length; i++) {
+
+            Image img = art(files[i], 520);
 
             if (img == null) {
                 continue;
             }
 
-            double w = 152;
-            double h = 86;
+            boolean front = i == files.length - 1;
 
             ImageView view = new ImageView(img);
-            view.setPreserveRatio(false);
+            view.setPreserveRatio(true);
             view.setSmooth(true);
-            view.setFitWidth(w);
-            view.setFitHeight(h);
-            view.setViewport(centreCrop(img, w / h, 0.42));
+            view.fitHeightProperty().bind(Bindings.createDoubleBinding(
+                    () -> clamp(root.getHeight() * (front ? 0.56 : 0.46), 200, 600),
+                    root.heightProperty()));
 
-            ColorAdjust grade = new ColorAdjust();
-            grade.setSaturation(-0.32);
-            grade.setBrightness(-0.04);
-            view.setEffect(grade);
+            ColorAdjust depth = new ColorAdjust();
+            depth.setSaturation(front ? -0.12 : -0.45);
+            depth.setBrightness(front ? 0.02 : 0.12);
+            view.setEffect(depth);
+            view.setOpacity(front ? 1 : 0.72);
 
-            StackPane frame = new StackPane(view);
-            frame.setMaxSize(w, h);
-            frame.setStyle("-fx-border-color: " + INK + "; -fx-border-width: 1;");
-
-            strip.getChildren().add(frame);
+            side.getChildren().add(view);
         }
 
-        Label caption = new Label(spaced(Lang.t("crew.frames").toUpperCase()));
-        caption.setFont(Font.font(labelFont, 8.5));
-        caption.setStyle("-fx-text-fill: " + GRAY + ";");
+        side.setTranslateX(left ? -74 : 74);
+        side.setTranslateY(34);
 
-        VBox band = new VBox(0, strip, caption);
-        band.setAlignment(Pos.CENTER);
-        VBox.setMargin(caption, new Insets(9, 0, 0, 0));
-        VBox.setMargin(band, new Insets(0, 0, 30, 0));
-
-        return band;
+        return side;
     }
 
-    /** The two of them, with a hairline between, under the red mark. */
-    private Node makers() {
+    /** The middle of the card: who made it, who is in it, and where to find it. */
+    private Node middle() {
 
         Region rule = new Region();
         rule.setPrefSize(54, 3);
@@ -853,23 +903,56 @@ public class OpeningScreen {
         made.setStyle("-fx-text-fill: " + GRAY + ";");
 
         Region hair = new Region();
-        hair.setPrefSize(1, 196);
-        hair.setMinSize(1, 196);
-        hair.setMaxSize(1, 196);
-        hair.setStyle("-fx-background-color: #D6CEC0;");
+        hair.setPrefSize(1, 184);
+        hair.setMinSize(1, 184);
+        hair.setMaxSize(1, 184);
+        hair.setStyle("-fx-background-color: #CFC6B6;");
 
-        HBox pair = new HBox(46,
+        HBox pair = new HBox(44,
                 person("Frezzard2.png", Lang.t("crew.name1"), Lang.t("crew.role1")),
                 hair,
                 person("djkzea.png", Lang.t("crew.name2"), Lang.t("crew.role2")));
         pair.setAlignment(Pos.BOTTOM_CENTER);
 
-        VBox band = new VBox(0, rule, made, pair);
-        band.setAlignment(Pos.CENTER);
-        VBox.setMargin(rule, new Insets(0, 0, 16, 0));
-        VBox.setMargin(pair, new Insets(22, 0, 0, 0));
+        Label castLine = new Label(spaced(
+                (Lang.t("crew.cast") + ": " + Lang.t("npc.lipoti") + " · " + Lang.t("npc.lakatos")
+                        + " · " + Lang.t("npc.peteri") + " · " + Lang.t("npc.kapzs")
+                        + " · " + Lang.t("npc.molnar")).toUpperCase()));
+        castLine.setFont(Font.font(labelFont, 8.5));
+        castLine.setStyle("-fx-text-fill: " + GRAY + ";");
 
-        return band;
+        Region thin = new Region();
+        thin.setPrefSize(200, 1);
+        thin.setMinSize(200, 1);
+        thin.setMaxSize(200, 1);
+        thin.setStyle("-fx-background-color: #CFC6B6;");
+
+        Label support = new Label(spaced(Lang.t("crew.support").toUpperCase()));
+        support.setFont(Font.font(labelFont, 9));
+        support.setStyle("-fx-text-fill: " + GRAY + ";");
+
+        Label site = new Label("fityeszthegame.com");
+        site.setFont(Font.font(headFont, 28));
+        site.setStyle("-fx-text-fill: " + RED + ";");
+
+        VBox column = new VBox(0, rule, made, pair, castLine, thin, support, site);
+        column.setAlignment(Pos.CENTER);
+        column.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        column.setMouseTransparent(true);
+
+        VBox.setMargin(rule, new Insets(0, 0, 16, 0));
+        VBox.setMargin(pair, new Insets(22, 0, 22, 0));
+        VBox.setMargin(thin, new Insets(22, 0, 16, 0));
+        VBox.setMargin(site, new Insets(4, 0, 0, 0));
+
+        // the window shrinks before the column does
+        DoubleBinding fit = Bindings.createDoubleBinding(
+                () -> clamp(root.getHeight() / 880.0, 0.62, 1.05), root.heightProperty());
+
+        column.scaleXProperty().bind(fit);
+        column.scaleYProperty().bind(fit);
+
+        return column;
     }
 
     /** One maker: the portrait, the name, what they did. */
@@ -884,7 +967,7 @@ public class OpeningScreen {
             ImageView view = new ImageView(img);
             view.setPreserveRatio(true);
             view.setSmooth(true);
-            view.setFitHeight(204);
+            view.setFitHeight(192);
             box.getChildren().add(view);
         }
 
@@ -900,108 +983,6 @@ public class OpeningScreen {
 
         box.getChildren().addAll(who, what);
         return box;
-    }
-
-    /** The people the game is about, as a film lists its players. */
-    private Node cast() {
-
-        String[][] players = {
-                {"lipoti.png", "npc.lipoti"},
-                {"lakatoservin.png", "npc.lakatos"},
-                {"drpeterikatalin.png", "npc.peteri"},
-                {"kapzsimre.png", "npc.kapzs"},
-                {"molnar.png", "npc.molnar"},
-        };
-
-        HBox row = new HBox(30);
-        row.setAlignment(Pos.TOP_CENTER);
-
-        for (String[] player : players) {
-
-            Node head = medallion("characters/" + player[0], 76);
-
-            if (head == null) {
-                continue;
-            }
-
-            Label name = new Label(spaced(Lang.t(player[1]).toUpperCase()));
-            name.setFont(Font.font(labelFont, 8));
-            name.setStyle("-fx-text-fill: " + GRAY + ";");
-
-            VBox one = new VBox(0, head, name);
-            one.setAlignment(Pos.TOP_CENTER);
-            VBox.setMargin(name, new Insets(8, 0, 0, 0));
-
-            row.getChildren().add(one);
-        }
-
-        Label heading = new Label(spaced(Lang.t("crew.cast").toUpperCase()));
-        heading.setFont(Font.font(labelFont, 9));
-        heading.setStyle("-fx-text-fill: " + RED_TEXT + ";");
-
-        VBox band = new VBox(0, heading, row);
-        band.setAlignment(Pos.CENTER);
-        VBox.setMargin(band, new Insets(34, 0, 0, 0));
-        VBox.setMargin(row, new Insets(14, 0, 0, 0));
-
-        return band;
-    }
-
-    /** The address, which is the only thing the card asks of anyone. */
-    private Node support() {
-
-        Region rule = new Region();
-        rule.setPrefSize(180, 1);
-        rule.setMinSize(180, 1);
-        rule.setMaxSize(180, 1);
-        rule.setStyle("-fx-background-color: #D6CEC0;");
-
-        Label support = new Label(spaced(Lang.t("crew.support").toUpperCase()));
-        support.setFont(Font.font(labelFont, 9));
-        support.setStyle("-fx-text-fill: " + GRAY + ";");
-
-        Label site = new Label("fityeszthegame.com");
-        site.setFont(Font.font(headFont, 26));
-        site.setStyle("-fx-text-fill: " + RED + ";");
-
-        VBox band = new VBox(0, rule, support, site);
-        band.setAlignment(Pos.CENTER);
-        VBox.setMargin(rule, new Insets(0, 0, 16, 0));
-        VBox.setMargin(site, new Insets(4, 0, 0, 0));
-        VBox.setMargin(band, new Insets(32, 0, 0, 0));
-
-        return band;
-    }
-
-    /** A head in a circle, cropped the way the log crops its portraits. */
-    private Node medallion(String file, double size) {
-
-        Image img = art(file, 300);
-
-        if (img == null) {
-            return null;
-        }
-
-        double side = img.getWidth() * 0.52;
-        double x = Math.max(0, img.getWidth() * 0.44 - side / 2);
-        double y = Math.max(0, img.getHeight() * 0.15 - side / 2);
-
-        side = Math.min(side, Math.min(img.getWidth() - x, img.getHeight() - y));
-
-        ImageView view = new ImageView(img);
-        view.setPreserveRatio(false);
-        view.setSmooth(true);
-        view.setFitWidth(size);
-        view.setFitHeight(size);
-        view.setViewport(new Rectangle2D(x, y, side, side));
-        view.setClip(new Circle(size / 2, size / 2, size / 2));
-
-        Circle ring = new Circle(size / 2);
-        ring.setFill(Color.TRANSPARENT);
-        ring.setStroke(Color.web(INK));
-        ring.setStrokeWidth(1);
-
-        return new StackPane(view, ring);
     }
 
     /** The part of an image that fills a frame of this shape. */

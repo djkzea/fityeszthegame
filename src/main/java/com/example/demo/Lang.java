@@ -114,7 +114,6 @@ public final class Lang {
         p("crew.role1",          "Kód · Történet", "Code · Story");
         p("crew.role2",          "Kód · Grafika", "Code · Art");
         p("crew.cast",           "Szereplők", "Cast");
-        p("crew.frames",         "Képek a játékból", "From the game");
         p("crew.support",        "Támogatás és hírek", "Support and news");
         p("ui.signOut",          "Kilépés a fiókból", "Sign out");
         p("ui.save",             "Mentés", "Save");

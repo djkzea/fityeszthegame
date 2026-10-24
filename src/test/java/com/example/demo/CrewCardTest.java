@@ -32,11 +32,9 @@ class CrewCardTest {
     void theArtTheCardBorrowsIsStillWhereItLooks() {
 
         String[] files = {
-                "bg/ch1_cafe.png", "bg/ch2_hall.png", "bg/ch4_office.png",
-                "bg/ch5_corridor.png", "bg/ch6_lodge.png", "bg/ch7-2_chamber.png",
+                "bg/ch3_hall.png",
                 "characters/lipoti.png", "characters/lakatoservin.png",
                 "characters/drpeterikatalin.png", "characters/kapzsimre.png",
-                "characters/molnar.png",
         };
 
         for (String file : files) {
