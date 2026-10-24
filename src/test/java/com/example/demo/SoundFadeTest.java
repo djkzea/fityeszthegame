@@ -50,10 +50,15 @@ class SoundFadeTest {
         assertTrue(last[1] > first[1] + 10,
                 "az erkezo jelzes nem erosodott: " + first[1] + " -> " + last[1]);
 
-        // and they were both audible in the middle of it, which is the overlap
+        // The middle of a crossfade is where both are nearly as loud as they get.
+        // A straight line in decibels puts them both near silence there instead,
+        // which is the hole the player heard as the music stumbling.
         float[] middle = curve.get(curve.size() / 2);
-        assertTrue(middle[0] > -40 && middle[1] > -40,
-                "nem szoltak egyszerre: " + middle[0] + " / " + middle[1]);
+
+        assertTrue(middle[1] > -15,
+                "az erkezo jelzes a keveres kozepen is alig szolt: " + middle[1] + " dB");
+        assertTrue(middle[0] > -15,
+                "a tavozo jelzes a keveres kozepere mar eltunt: " + middle[0] + " dB");
 
         Thread.sleep(600);
         assertTrue(sound.sounding(Sound.Track.MENU), "a menu jelzes nem maradt talpon");

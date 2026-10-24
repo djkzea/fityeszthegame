@@ -66,7 +66,7 @@ public final class Sound {
 
     /** How long one cue takes to become another. */
     private static final int FADE_MS = 900;
-    private static final int STEP_MS = 20;
+    private static final int STEP_MS = 12;
 
     /** Quiet enough to be gone, loud enough that the mixer does not round it away. */
     private static final float SILENT_DB = -60f;
@@ -81,6 +81,7 @@ public final class Sound {
         private final Clip clip;
         private final FloatControl gain;
         private final float levelDb;
+        private final double level;
 
         /** The only fade allowed to touch this cue; a newer one takes over. */
         private volatile long fade;
@@ -89,6 +90,7 @@ public final class Sound {
             this.clip = clip;
             this.gain = gain;
             this.levelDb = levelDb;
+            this.level = Math.pow(10, levelDb / 20.0);
         }
 
         void setDb(float db) {
@@ -99,6 +101,15 @@ public final class Sound {
 
         float db() {
             return gain == null ? levelDb : gain.getValue();
+        }
+
+        /** The level as the ear takes it: 0 is gone, `level` is where the cue sits. */
+        void setAmplitude(double amp) {
+            setDb(amp <= 0.0001 ? SILENT_DB : (float) (20 * Math.log10(amp)));
+        }
+
+        double amplitude() {
+            return Math.pow(10, db() / 20.0);
         }
 
         void from(boolean loops) {
@@ -213,7 +224,7 @@ public final class Sound {
         }
 
         if (going != null) {
-            fade(going, going.db(), SILENT_DB, true);
+            fade(going, going.amplitude(), 0, true);
         }
     }
 
@@ -231,7 +242,7 @@ public final class Sound {
         if (on) {
             rise(now, current.loops);
         } else {
-            cues.values().forEach(cue -> fade(cue, cue.db(), SILENT_DB, true));
+            cues.values().forEach(cue -> fade(cue, cue.amplitude(), 0, true));
         }
     }
 
@@ -295,17 +306,28 @@ public final class Sound {
     /** Starts a cue from silence and brings it up to its own level. */
     private void rise(Cue cue, boolean loops) {
 
-        float from = cue.clip.isRunning() ? cue.db() : SILENT_DB;
+        double from = cue.clip.isRunning() ? cue.amplitude() : 0;
 
         if (!cue.clip.isRunning()) {
             cue.setDb(SILENT_DB);
             cue.from(loops);
         }
 
-        fade(cue, from, cue.levelDb, false);
+        fade(cue, from, cue.level, false);
     }
 
-    private void fade(Cue cue, float fromDb, float toDb, boolean stopAtEnd) {
+    /**
+     * Moves a cue's level, in what the ear hears rather than in decibels.
+     *
+     * A straight line in decibels is not a fade: halfway through a ramp from
+     * silence to -8 dB the sound is at -34 dB, which is two per cent of it, so
+     * both cues sat in a hole in the middle of every switch and the music
+     * seemed to stumble. The ramp is on the amplitude now, around a quarter
+     * turn of a circle - the one leaving on the cosine, the one arriving on
+     * the sine - which is the shape that keeps the pair's power steady as one
+     * hands over to the other.
+     */
+    private void fade(Cue cue, double fromAmp, double toAmp, boolean stopAtEnd) {
 
         long token = TOKENS.incrementAndGet();
         cue.fade = token;
@@ -320,7 +342,10 @@ public final class Sound {
                     return;         // a newer fade owns this cue now
                 }
 
-                cue.setDb(fromDb + (toDb - fromDb) * i / steps);
+                double turn = (Math.PI / 2) * i / steps;
+                double amp = fromAmp * Math.cos(turn) + toAmp * Math.sin(turn);
+
+                cue.setAmplitude(amp);
 
                 try {
                     Thread.sleep(STEP_MS);
