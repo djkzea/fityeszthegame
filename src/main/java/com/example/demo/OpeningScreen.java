@@ -95,6 +95,10 @@ public class OpeningScreen {
     /** The slot whose overwrite is waiting for a second press. */
     private int confirming = 0;
 
+    /** The slot whose deletion has been asked for, and one that would not go. */
+    private int deleting = 0;
+    private int deleteFailed = 0;
+
     private java.util.Map<Integer, SaveData> runs = java.util.Map.of();
 
     private boolean splashDone = false;
@@ -343,6 +347,10 @@ public class OpeningScreen {
 
     /** The note at the far right; a warning wears the accent instead of grey. */
     private Node menuRow(Button button, String note, boolean warning) {
+        return menuRow(button, note, warning, null);
+    }
+
+    private Node menuRow(Button button, String note, boolean warning, Node extra) {
 
         HBox row = new HBox();
         row.setAlignment(Pos.CENTER_LEFT);
@@ -361,7 +369,31 @@ public class OpeningScreen {
             row.getChildren().add(n);
         }
 
+        if (extra != null) {
+            row.getChildren().add(extra);
+        }
+
         return row;
+    }
+
+    /** The cross at the end of a saved run's line. */
+    private Button deleteButton(int slot) {
+
+        Button x = new Button("\u00D7");
+        x.setFont(Font.font(headFont, 20));
+        x.setFocusTraversable(false);
+        x.setPadding(new Insets(0, 6, 2, 12));
+        x.setTooltip(new javafx.scene.control.Tooltip(Lang.t("ui.delete")));
+
+        Runnable paint = () -> x.setStyle("-fx-background-color: transparent;"
+                + "-fx-text-fill: " + (x.isHover() || deleting == slot ? RED : GRAY) + ";"
+                + "-fx-cursor: hand;");
+
+        paint.run();
+        x.hoverProperty().addListener((o, a, b) -> paint.run());
+        x.setOnAction(e -> askDelete(slot));
+
+        return x;
     }
 
     private Button menuButton(String text, boolean enabled, Runnable action) {
@@ -535,6 +567,8 @@ public class OpeningScreen {
                 runs.isEmpty() ? null : () -> {
                     mode = Mode.LOAD;
                     confirming = 0;
+                    deleting = 0;
+                    deleteFailed = 0;
                     rebuild();
                 });
 
@@ -591,22 +625,46 @@ public class OpeningScreen {
                     : (run.playerName() == null || run.playerName().isBlank()
                             ? Lang.t("ui.guest") : run.playerName());
 
-            String note = confirming == slot
-                    ? Lang.t("ui.overwriteAsk").toUpperCase()
-                    : (run == null ? null : runNote(run));
+            String note;
+
+            if (confirming == slot) {
+                note = Lang.t("ui.overwriteAsk").toUpperCase();
+            } else if (deleting == slot) {
+                note = Lang.t("ui.deleteAsk").toUpperCase();
+            } else if (deleteFailed == slot) {
+                note = Lang.t("ui.deleteFailed").toUpperCase();
+            } else {
+                note = run == null ? null : runNote(run);
+            }
 
             Button row = menuButton(slot + " · " + name, usable, usable ? () -> choose(slot) : null);
+            row.getProperties().put("slot", slot);
 
-            menu.getChildren().add(menuRow(row, note, confirming == slot));
+            boolean red = confirming == slot || deleting == slot || deleteFailed == slot;
+
+            // a run can be thrown away from the list it is offered in
+            Node drop = mode == Mode.LOAD && run != null ? deleteButton(slot) : null;
+
+            menu.getChildren().add(menuRow(row, note, red, drop));
 
             if (usable) {
                 nav.add(row);
             }
         }
 
+        if (mode == Mode.LOAD && !runs.isEmpty()) {
+            Label hint = new Label(spaced(Lang.t("ui.deleteHint").toUpperCase()));
+            hint.setFont(Font.font(labelFont, 8));
+            hint.setStyle("-fx-text-fill: " + GRAY + ";");
+            VBox.setMargin(hint, new Insets(8, 0, 2, 3));
+            menu.getChildren().add(hint);
+        }
+
         Button back = menuButton(Lang.t("ui.back"), true, () -> {
             mode = Mode.MENU;
             confirming = 0;
+            deleting = 0;
+            deleteFailed = 0;
             rebuild();
         });
 
@@ -615,7 +673,83 @@ public class OpeningScreen {
     }
 
     /** A slot was picked: load it, start in it, or ask before writing over it. */
+    /**
+     * Asks, then throws the run away.
+     *
+     * The second press is the answer, the way overwriting works. On an account
+     * the row goes first and the file here only follows if it did: a file
+     * deleted while the row survives is a save that walks back in at the next
+     * sign-in, which would be worse than not deleting it at all.
+     */
+    void askDelete(int slot) {
+
+        if (runs.get(slot) == null) {
+            return;
+        }
+
+        deleteFailed = 0;
+
+        if (deleting != slot) {
+            deleting = slot;        // the second press is the answer
+            confirming = 0;
+            rebuild();
+            return;
+        }
+
+        Account.Session signedIn = account == null ? null : account.session().orElse(null);
+
+        if (signedIn == null || saves == null) {
+
+            if (saves != null) {
+                saves.deleteLocal(slot);
+            }
+
+            dropped(slot);
+            return;
+        }
+
+        Thread worker = new Thread(() -> {
+
+            boolean gone = saves.deleteCloud(slot, signedIn.accessToken());
+
+            javafx.application.Platform.runLater(() -> {
+
+                if (gone) {
+                    saves.deleteLocal(slot);
+                    dropped(slot);
+                } else {
+                    deleting = 0;
+                    deleteFailed = slot;
+                    rebuild();
+                }
+            });
+
+        }, "fityesz-delete");
+
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private void dropped(int slot) {
+
+        java.util.Map<Integer, SaveData> left = new java.util.LinkedHashMap<>(runs);
+        left.remove(slot);
+        runs = left;
+
+        deleting = 0;
+        deleteFailed = 0;
+
+        if (runs.isEmpty()) {
+            mode = Mode.MENU;       // nothing left to pick from
+        }
+
+        rebuild();
+    }
+
     private void choose(int slot) {
+
+        deleting = 0;
+        deleteFailed = 0;
 
         SaveData run = runs.get(slot);
 
@@ -722,6 +856,13 @@ public class OpeningScreen {
             case ENTER, SPACE -> {
                 if (selected != null) {
                     selected.fire();
+                }
+                e.consume();
+            }
+            case DELETE, BACK_SPACE -> {
+                if (mode == Mode.LOAD && selected != null
+                        && selected.getProperties().get("slot") instanceof Integer slot) {
+                    askDelete(slot);
                 }
                 e.consume();
             }

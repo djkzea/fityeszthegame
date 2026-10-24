@@ -142,6 +142,10 @@ public final class Lang {
         p("ui.chooseSlot",       "Hova kerüljön az új futás?", "Where should the new run go?");
         p("ui.whichRun",         "Melyiket folytatod?", "Which run do you continue?");
         p("ui.overwriteAsk",     "Felülírod? Nyomd meg újra", "Overwrite? Press again");
+        p("ui.delete",           "Törlés", "Delete");
+        p("ui.deleteAsk",        "Törlöd? Nyomd meg újra", "Delete? Press again");
+        p("ui.deleteFailed",     "Nem sikerült törölni", "Could not delete");
+        p("ui.deleteHint",       "Törlés: a sor végén vagy DEL", "Delete: at the end of the row or DEL");
         p("ui.account",          "Fiók", "Account");
         p("ui.accountWhy",       "A futásod a fiókodban is megmarad, és a weboldalon is folytathatod.",
                                  "Your run is kept in your account, and you can carry on with it on the website.");

@@ -63,6 +63,46 @@ public class SaveStore {
         }
     }
 
+    /** Drops the run kept on this machine. Quiet if there was none. */
+    public void deleteLocal(int slot) {
+
+        try {
+            Files.deleteIfExists(fileFor(slot));
+        } catch (IOException e) {
+            System.err.println("save: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Drops the run kept on the account, and says whether it is gone.
+     *
+     * The answer matters: if the row survives and the file here does not, the
+     * next sign-in hands the run straight back, and the player watches a save
+     * they deleted return. Row level security limits the delete to this
+     * player's own rows, so the slot is the whole address it needs.
+     */
+    public boolean deleteCloud(int slot, String token) {
+
+        if (sb == null || token == null) {
+            return true;        // nothing up there to drop
+        }
+
+        try {
+            Transport.Res res = sb.call("DELETE", "/rest/v1/saves?slot=eq." + slot, null, token,
+                    java.util.Map.of("Prefer", "return=minimal"));
+
+            if (!res.ok()) {
+                System.err.println("save: torles " + res.status() + " " + res.body());
+            }
+
+            return res.ok();
+
+        } catch (IOException e) {
+            System.err.println("save: " + e.getMessage());
+            return false;
+        }
+    }
+
     public Optional<SaveData> loadLocal(int slot) {
 
         Path file = fileFor(slot);
