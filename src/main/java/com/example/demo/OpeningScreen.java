@@ -20,7 +20,9 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
+import javafx.scene.effect.ColorAdjust;
 import javafx.scene.image.ImageView;
+import javafx.scene.shape.Circle;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
@@ -764,10 +766,81 @@ public class OpeningScreen {
      * Who made it, the way a film says so: after the wordmark, before the
      * poster, held long enough to read and gone on any key.
      *
-     * It is also where the support page is named - the one place in the game
-     * that asks for anything, and it asks once.
+     * It is a card of four bands - frames from the game, the two who made it,
+     * the cast they wrote, and the address of the site. It is also the one
+     * place in the game that asks for anything, and it asks once.
      */
     private Node buildCrew() {
+
+        VBox box = new VBox(0, filmstrip(), makers(), cast(), support());
+        box.setAlignment(Pos.CENTER);
+        box.setMouseTransparent(true);
+
+        // taller than the wordmark it replaces, so it rides the window like the menu
+        DoubleBinding fit = Bindings.createDoubleBinding(
+                () -> clamp(root.getHeight() / 940.0, 0.52, 1.08), root.heightProperty());
+
+        box.scaleXProperty().bind(fit);
+        box.scaleYProperty().bind(fit);
+
+        return box;
+    }
+
+    /** Six frames out of the seven chapters, graded down so the names stay on top. */
+    private Node filmstrip() {
+
+        String[] frames = {
+                "bg/ch1_cafe.png", "bg/ch2_hall.png", "bg/ch4_office.png",
+                "bg/ch5_corridor.png", "bg/ch6_lodge.png", "bg/ch7-2_chamber.png"
+        };
+
+        HBox strip = new HBox(7);
+        strip.setAlignment(Pos.CENTER);
+
+        for (String file : frames) {
+
+            Image img = art(file, 460);
+
+            if (img == null) {
+                continue;
+            }
+
+            double w = 152;
+            double h = 86;
+
+            ImageView view = new ImageView(img);
+            view.setPreserveRatio(false);
+            view.setSmooth(true);
+            view.setFitWidth(w);
+            view.setFitHeight(h);
+            view.setViewport(centreCrop(img, w / h, 0.42));
+
+            ColorAdjust grade = new ColorAdjust();
+            grade.setSaturation(-0.32);
+            grade.setBrightness(-0.04);
+            view.setEffect(grade);
+
+            StackPane frame = new StackPane(view);
+            frame.setMaxSize(w, h);
+            frame.setStyle("-fx-border-color: " + INK + "; -fx-border-width: 1;");
+
+            strip.getChildren().add(frame);
+        }
+
+        Label caption = new Label(spaced(Lang.t("crew.frames").toUpperCase()));
+        caption.setFont(Font.font(labelFont, 8.5));
+        caption.setStyle("-fx-text-fill: " + GRAY + ";");
+
+        VBox band = new VBox(0, strip, caption);
+        band.setAlignment(Pos.CENTER);
+        VBox.setMargin(caption, new Insets(9, 0, 0, 0));
+        VBox.setMargin(band, new Insets(0, 0, 30, 0));
+
+        return band;
+    }
+
+    /** The two of them, with a hairline between, under the red mark. */
+    private Node makers() {
 
         Region rule = new Region();
         rule.setPrefSize(54, 3);
@@ -779,27 +852,24 @@ public class OpeningScreen {
         made.setFont(Font.font(labelFont, 11));
         made.setStyle("-fx-text-fill: " + GRAY + ";");
 
-        HBox pair = new HBox(64,
+        Region hair = new Region();
+        hair.setPrefSize(1, 196);
+        hair.setMinSize(1, 196);
+        hair.setMaxSize(1, 196);
+        hair.setStyle("-fx-background-color: #D6CEC0;");
+
+        HBox pair = new HBox(46,
                 person("Frezzard2.png", Lang.t("crew.name1"), Lang.t("crew.role1")),
+                hair,
                 person("djkzea.png", Lang.t("crew.name2"), Lang.t("crew.role2")));
         pair.setAlignment(Pos.BOTTOM_CENTER);
 
-        Label support = new Label(spaced(Lang.t("crew.support").toUpperCase()));
-        support.setFont(Font.font(labelFont, 9));
-        support.setStyle("-fx-text-fill: " + GRAY + ";");
+        VBox band = new VBox(0, rule, made, pair);
+        band.setAlignment(Pos.CENTER);
+        VBox.setMargin(rule, new Insets(0, 0, 16, 0));
+        VBox.setMargin(pair, new Insets(22, 0, 0, 0));
 
-        Label site = new Label("fityeszthegame.com");
-        site.setFont(Font.font(headFont, 24));
-        site.setStyle("-fx-text-fill: " + RED + ";");
-
-        VBox box = new VBox(0, rule, made, pair, support, site);
-        box.setAlignment(Pos.CENTER);
-        box.setMouseTransparent(true);
-        VBox.setMargin(rule, new Insets(0, 0, 18, 0));
-        VBox.setMargin(pair, new Insets(26, 0, 30, 0));
-        VBox.setMargin(site, new Insets(5, 0, 0, 0));
-
-        return box;
+        return band;
     }
 
     /** One maker: the portrait, the name, what they did. */
@@ -808,19 +878,14 @@ public class OpeningScreen {
         VBox box = new VBox(0);
         box.setAlignment(Pos.CENTER);
 
-        try (InputStream in = OpeningScreen.class
-                .getResourceAsStream("/com/example/demo/fityesz_art/crew/" + file)) {
+        Image img = art("crew/" + file, 320);
 
-            if (in != null) {
-                ImageView view = new ImageView(new Image(in));
-                view.setPreserveRatio(true);
-                view.setSmooth(true);
-                view.setFitHeight(250);
-                box.getChildren().add(view);
-            }
-
-        } catch (Exception withoutAPortrait) {
-            // the names carry it on their own
+        if (img != null) {
+            ImageView view = new ImageView(img);
+            view.setPreserveRatio(true);
+            view.setSmooth(true);
+            view.setFitHeight(204);
+            box.getChildren().add(view);
         }
 
         Label who = new Label(name.toUpperCase());
@@ -835,6 +900,138 @@ public class OpeningScreen {
 
         box.getChildren().addAll(who, what);
         return box;
+    }
+
+    /** The people the game is about, as a film lists its players. */
+    private Node cast() {
+
+        String[][] players = {
+                {"lipoti.png", "npc.lipoti"},
+                {"lakatoservin.png", "npc.lakatos"},
+                {"drpeterikatalin.png", "npc.peteri"},
+                {"kapzsimre.png", "npc.kapzs"},
+                {"molnar.png", "npc.molnar"},
+        };
+
+        HBox row = new HBox(30);
+        row.setAlignment(Pos.TOP_CENTER);
+
+        for (String[] player : players) {
+
+            Node head = medallion("characters/" + player[0], 76);
+
+            if (head == null) {
+                continue;
+            }
+
+            Label name = new Label(spaced(Lang.t(player[1]).toUpperCase()));
+            name.setFont(Font.font(labelFont, 8));
+            name.setStyle("-fx-text-fill: " + GRAY + ";");
+
+            VBox one = new VBox(0, head, name);
+            one.setAlignment(Pos.TOP_CENTER);
+            VBox.setMargin(name, new Insets(8, 0, 0, 0));
+
+            row.getChildren().add(one);
+        }
+
+        Label heading = new Label(spaced(Lang.t("crew.cast").toUpperCase()));
+        heading.setFont(Font.font(labelFont, 9));
+        heading.setStyle("-fx-text-fill: " + RED_TEXT + ";");
+
+        VBox band = new VBox(0, heading, row);
+        band.setAlignment(Pos.CENTER);
+        VBox.setMargin(band, new Insets(34, 0, 0, 0));
+        VBox.setMargin(row, new Insets(14, 0, 0, 0));
+
+        return band;
+    }
+
+    /** The address, which is the only thing the card asks of anyone. */
+    private Node support() {
+
+        Region rule = new Region();
+        rule.setPrefSize(180, 1);
+        rule.setMinSize(180, 1);
+        rule.setMaxSize(180, 1);
+        rule.setStyle("-fx-background-color: #D6CEC0;");
+
+        Label support = new Label(spaced(Lang.t("crew.support").toUpperCase()));
+        support.setFont(Font.font(labelFont, 9));
+        support.setStyle("-fx-text-fill: " + GRAY + ";");
+
+        Label site = new Label("fityeszthegame.com");
+        site.setFont(Font.font(headFont, 26));
+        site.setStyle("-fx-text-fill: " + RED + ";");
+
+        VBox band = new VBox(0, rule, support, site);
+        band.setAlignment(Pos.CENTER);
+        VBox.setMargin(rule, new Insets(0, 0, 16, 0));
+        VBox.setMargin(site, new Insets(4, 0, 0, 0));
+        VBox.setMargin(band, new Insets(32, 0, 0, 0));
+
+        return band;
+    }
+
+    /** A head in a circle, cropped the way the log crops its portraits. */
+    private Node medallion(String file, double size) {
+
+        Image img = art(file, 300);
+
+        if (img == null) {
+            return null;
+        }
+
+        double side = img.getWidth() * 0.52;
+        double x = Math.max(0, img.getWidth() * 0.44 - side / 2);
+        double y = Math.max(0, img.getHeight() * 0.15 - side / 2);
+
+        side = Math.min(side, Math.min(img.getWidth() - x, img.getHeight() - y));
+
+        ImageView view = new ImageView(img);
+        view.setPreserveRatio(false);
+        view.setSmooth(true);
+        view.setFitWidth(size);
+        view.setFitHeight(size);
+        view.setViewport(new Rectangle2D(x, y, side, side));
+        view.setClip(new Circle(size / 2, size / 2, size / 2));
+
+        Circle ring = new Circle(size / 2);
+        ring.setFill(Color.TRANSPARENT);
+        ring.setStroke(Color.web(INK));
+        ring.setStrokeWidth(1);
+
+        return new StackPane(view, ring);
+    }
+
+    /** The part of an image that fills a frame of this shape. */
+    private static Rectangle2D centreCrop(Image img, double aspect, double bias) {
+
+        double cw;
+        double ch;
+
+        if (img.getWidth() / img.getHeight() > aspect) {
+            ch = img.getHeight();
+            cw = ch * aspect;
+        } else {
+            cw = img.getWidth();
+            ch = cw / aspect;
+        }
+
+        return new Rectangle2D((img.getWidth() - cw) / 2, (img.getHeight() - ch) * bias, cw, ch);
+    }
+
+    /** Any of the game's own art, decoded no larger than it is drawn. */
+    private Image art(String file, double width) {
+
+        try (InputStream in = OpeningScreen.class
+                .getResourceAsStream("/com/example/demo/fityesz_art/" + file)) {
+
+            return in == null ? null : new Image(in, width, 0, true, true);
+
+        } catch (Exception missing) {
+            return null;
+        }
     }
 
     private void playSplash() {
@@ -865,7 +1062,7 @@ public class OpeningScreen {
         crewIn.setFromValue(0);
         crewIn.setToValue(1);
 
-        PauseTransition crewHold = new PauseTransition(Duration.seconds(2.2));
+        PauseTransition crewHold = new PauseTransition(Duration.seconds(3.0));
 
         FadeTransition crewOut = new FadeTransition(Duration.seconds(0.7), crew);
         crewOut.setFromValue(1);

@@ -24,6 +24,27 @@ class CrewCardTest {
         }
     }
 
+    /**
+     * The card is mostly the game's own art. A renamed file does not break the
+     * build or throw - it just leaves a hole in the strip nobody put there.
+     */
+    @Test
+    void theArtTheCardBorrowsIsStillWhereItLooks() {
+
+        String[] files = {
+                "bg/ch1_cafe.png", "bg/ch2_hall.png", "bg/ch4_office.png",
+                "bg/ch5_corridor.png", "bg/ch6_lodge.png", "bg/ch7-2_chamber.png",
+                "characters/lipoti.png", "characters/lakatoservin.png",
+                "characters/drpeterikatalin.png", "characters/kapzsimre.png",
+                "characters/molnar.png",
+        };
+
+        for (String file : files) {
+            assertNotNull(GameUI.class.getResource("/com/example/demo/fityesz_art/" + file),
+                    "az alkotok kartyaja erre a kepre hivatkozik: " + file);
+        }
+    }
+
     @Test
     void theCardSpeaksBothLanguages() {
 
