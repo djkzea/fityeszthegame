@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Base64;
 import java.util.Optional;
 
 /**
@@ -70,6 +71,89 @@ public final class Account {
     }
 
     /**
+     * The session, with a token that is still good.
+     *
+     * Supabase hands out an access token that lasts an hour, and a game is
+     * easily played for longer than that. Nothing used to notice: every save
+     * from then on came back "JWT expired" into a terminal nobody reads, the
+     * run stopped reaching the account, and a save could not even be deleted.
+     * The refresh token outlives the other, so the pair is traded in for a new
+     * one when the first is spent.
+     *
+     * This talks to the network, so it belongs on a worker thread, never on the
+     * JavaFX one. If the trade fails the old session is handed back and the
+     * caller fails the way it used to - a lost refresh token is a sign-in
+     * problem, not something to throw a run away over.
+     */
+    public synchronized Optional<Session> fresh() {
+
+        if (restore().isEmpty()) {
+            return Optional.empty();
+        }
+
+        if (!spent(session.accessToken())) {
+            return Optional.of(session);
+        }
+
+        try {
+            Transport.Res res = call("POST", "/auth/v1/token?grant_type=refresh_token",
+                    write(new RefreshBody(session.refreshToken())), null);
+
+            if (!res.ok()) {
+                System.err.println("account: a bejelentkezes nem ujithato (" + res.status() + ")");
+                return Optional.of(session);
+            }
+
+            JsonNode tokens = read(res.body());
+
+            session = new Session(
+                    tokens.path("access_token").asText(),
+                    tokens.path("refresh_token").asText(),
+                    session.userId(), session.displayName(), session.anonymous());
+
+            store(session, sessionFile);
+
+            // a guest's identity is kept in its own file as well
+            if (session.anonymous()) {
+                store(session, guestFile);
+            }
+
+            return Optional.of(session);
+
+        } catch (AuthException e) {
+            System.err.println("account: " + e.messageKey());
+            return Optional.of(session);
+        }
+    }
+
+    /**
+     * Whether a token is spent, or will be within the minute.
+     *
+     * The expiry is in the token itself - the middle of the three dotted parts
+     * is plain JSON - so this needs no network to decide. Anything unreadable
+     * counts as spent: trading a token in costs one request, using a dead one
+     * costs the save.
+     */
+    static boolean spent(String jwt) {
+
+        try {
+            String[] parts = jwt.split("\\.");
+
+            if (parts.length < 2) {
+                return true;
+            }
+
+            JsonNode body = Json.mapper().readTree(Base64.getUrlDecoder().decode(parts[1]));
+            long expires = body.path("exp").asLong(0);
+
+            return expires == 0 || expires - 60 <= System.currentTimeMillis() / 1000;
+
+        } catch (Exception unreadable) {
+            return true;
+        }
+    }
+
+    /**
      * Whether the last registration left an address waiting on its confirmation
      * link. The session works either way; the address does not reach another
      * machine until the link is clicked.
@@ -129,7 +213,7 @@ public final class Account {
     public synchronized Optional<Session> ensureSession() {
 
         if (restore().isPresent()) {
-            return Optional.of(session);
+            return fresh();
         }
 
         try {

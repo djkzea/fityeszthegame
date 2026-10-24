@@ -152,7 +152,7 @@ public class HelloApplication extends Application {
 
             Thread merge = new Thread(() -> {
 
-                controller.account().session().ifPresent(s ->
+                controller.account().fresh().ifPresent(s ->
                         controller.saves().reconcile(s.userId(), s.accessToken()));
 
                 Platform.runLater(back);

@@ -710,7 +710,9 @@ public class OpeningScreen {
 
         Thread worker = new Thread(() -> {
 
-            boolean gone = saves.deleteCloud(slot, signedIn.accessToken());
+            // an hour into a game the token is spent; trade it in before asking
+            Account.Session now = account.fresh().orElse(signedIn);
+            boolean gone = saves.deleteCloud(slot, now.accessToken());
 
             javafx.application.Platform.runLater(() -> {
 
@@ -814,9 +816,11 @@ public class OpeningScreen {
             // Both directions, every time the title page is built: a run played
             // offline, or before signing in, reaches the account here rather
             // than waiting for its next chapter to end.
-            saves.reconcile(signedIn.userId(), signedIn.accessToken());
+            Account.Session now = account.fresh().orElse(signedIn);
 
-            java.util.Map<Integer, SaveData> merged = saves.runs(signedIn.accessToken());
+            saves.reconcile(now.userId(), now.accessToken());
+
+            java.util.Map<Integer, SaveData> merged = saves.runs(now.accessToken());
 
             javafx.application.Platform.runLater(() -> {
                 runs = merged;

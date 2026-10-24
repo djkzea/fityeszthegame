@@ -31,8 +31,22 @@ class AccountTest {
         }
     }
 
+    /**
+     * A token shaped like the real thing: the middle part carries the expiry,
+     * and the game reads it to decide whether the session has to be traded in.
+     */
+    private static String tokenExpiring(long secondsFromNow) {
+
+        String body = "{\"exp\":" + (System.currentTimeMillis() / 1000 + secondsFromNow) + "}";
+
+        return "fejlec." + java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)) + ".alairas";
+    }
+
+    private static final String ACCESS = tokenExpiring(3600);
+
     private static final String TOKENS =
-            "{\"access_token\":\"acc1\",\"refresh_token\":\"ref1\"}";
+            "{\"access_token\":\"" + ACCESS + "\",\"refresh_token\":\"ref1\"}";
 
     private static final String USER =
             "{\"id\":\"u-1\",\"user_metadata\":{\"display_name\":\"Zsombi\"}}";
@@ -48,7 +62,7 @@ class AccountTest {
 
         Account.Session s = account.signIn("zsombi", "titkos123");
 
-        assertEquals("acc1", s.accessToken());
+        assertEquals(ACCESS, s.accessToken());
         assertEquals("u-1", s.userId());
         assertEquals("Zsombi", s.displayName());
 
@@ -62,7 +76,7 @@ class AccountTest {
         FakeTransport.Call who = t.calls.get(1);
         assertEquals("GET", who.method());
         assertEquals("https://p.supabase.co/auth/v1/user", who.url());
-        assertEquals("Bearer acc1", who.headers().get("Authorization"));
+        assertEquals("Bearer " + ACCESS, who.headers().get("Authorization"));
     }
 
     @Test
@@ -74,7 +88,7 @@ class AccountTest {
         Account account = new Account(
                 new Supabase("https://p.supabase.co", "anon-key", t), dir.resolve("session.json"));
 
-        assertEquals("acc1", account.signIn("zsombi@pelda.hu", "titkos123").accessToken());
+        assertEquals(ACCESS, account.signIn("zsombi@pelda.hu", "titkos123").accessToken());
 
         assertEquals("https://p.supabase.co/auth/v1/token?grant_type=password", t.calls.get(0).url());
         assertTrue(t.calls.get(0).body().contains("\"email\":\"zsombi@pelda.hu\""));
@@ -354,5 +368,72 @@ class AccountTest {
 
         assertEquals("https://p.supabase.co/auth/v1/token?grant_type=refresh_token",
                 t.calls.get(2).url());
+    }
+
+    @Test
+    void aTokenWithAnHourLeftIsGood() {
+        assertFalse(Account.spent(tokenExpiring(3600)));
+    }
+
+    @Test
+    void anHourIntoAGameTheTokenIsSpent() {
+        assertTrue(Account.spent(tokenExpiring(-5)));
+    }
+
+    /**
+     * The minute before it runs out counts as spent: a save that leaves now can
+     * still arrive after the token has died.
+     */
+    @Test
+    void theLastMinuteCountsAsSpent() {
+        assertTrue(Account.spent(tokenExpiring(30)));
+    }
+
+    /**
+     * The one from the field: an hour into a game every save came back "JWT
+     * expired". The stored session is traded in for a new one - and the guest
+     * is not signed in again, which would have left the run behind on the old
+     * identity.
+     */
+    @Test
+    void aSessionWhoseTokenRanOutIsTradedInRatherThanReplaced(@TempDir Path dir) {
+
+        FakeTransport first = new FakeTransport();
+        first.answers.add(new Transport.Res(200,
+                "{\"access_token\":\"" + tokenExpiring(-10) + "\",\"refresh_token\":\"ref1\"}"));
+        first.answers.add(new Transport.Res(200,
+                "{\"id\":\"u-guest\",\"is_anonymous\":true,\"user_metadata\":{}}"));
+
+        Path file = dir.resolve("session.json");
+        new Account(new Supabase("https://p.supabase.co", "anon-key", first), file).ensureSession();
+
+        FakeTransport again = new FakeTransport();
+        again.answers.add(new Transport.Res(200,
+                "{\"access_token\":\"" + tokenExpiring(3600) + "\",\"refresh_token\":\"ref2\"}"));
+
+        Account account = new Account(
+                new Supabase("https://p.supabase.co", "anon-key", again), file);
+
+        Account.Session back = account.ensureSession().orElseThrow();
+
+        assertEquals("u-guest", back.userId(), "nem ugyanaz a vendeg maradt");
+        assertEquals("ref2", back.refreshToken(), "nem cserelte le a frissito kivonatot");
+        assertFalse(Account.spent(back.accessToken()), "a friss kivonat is lejartnak szamit");
+
+        assertEquals(1, again.calls.size(), "egyetlen keres lett volna eleg");
+        assertTrue(again.calls.get(0).url().endsWith("grant_type=refresh_token"),
+                "nem a kivonatcserere ment: " + again.calls.get(0).url());
+
+        // and it is remembered, so the next start does not have to trade again
+        assertFalse(Account.spent(new Account(
+                new Supabase("https://p.supabase.co", "anon-key", new FakeTransport()), file)
+                .restore().orElseThrow().accessToken()));
+    }
+
+    @Test
+    void anythingUnreadableCountsAsSpent() {
+        assertTrue(Account.spent("nem-token"));
+        assertTrue(Account.spent(""));
+        assertTrue(Account.spent("a.bbbb.c"));
     }
 }
