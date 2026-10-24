@@ -217,15 +217,30 @@ public final class Sound {
             }
         }
 
-        try (SourceDataLine line = AudioSystem.getSourceDataLine(FORMAT)) {
+        // The output is opened again if it is lost. A machine's sound device comes
+        // and goes - headphones are plugged in, the system changes its mind about
+        // which one is in use - and when it does, the line under us dies. Without
+        // this the game is silent from then on, which is what a player met after
+        // a while in the menu.
+        while (true) {
 
-            line.open(FORMAT, BLOCK * 4 * 4);
-            line.start();
+            try (SourceDataLine line = AudioSystem.getSourceDataLine(FORMAT)) {
 
-            pump(line);
+                line.open(FORMAT, BLOCK * 4 * 4);
+                line.start();
 
-        } catch (Exception noSound) {
-            System.err.println("sound: " + noSound.getMessage());
+                pump(line);
+
+            } catch (Exception lost) {
+                System.err.println("sound: " + lost.getMessage());
+            }
+
+            try {
+                Thread.sleep(1200);     // give the device a moment to come back
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 
@@ -234,6 +249,7 @@ public final class Sound {
 
         float[] mix = new float[BLOCK * 2];
         byte[] out = new byte[BLOCK * 4];
+        int refused = 0;
 
         while (true) {
 
@@ -253,7 +269,15 @@ public final class Sound {
                 out[i * 2 + 1] = (byte) ((s >> 8) & 0xFF);
             }
 
-            line.write(out, 0, out.length);
+            int written = line.write(out, 0, out.length);
+
+            // a line that stops taking what it is given has gone; let it be reopened
+            refused = written < out.length ? refused + 1 : 0;
+
+            if (refused > 20) {
+                System.err.println("sound: a kimenet nem fogadja a hangot, ujranyitas");
+                return;
+            }
         }
     }
 
