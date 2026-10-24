@@ -1,20 +1,23 @@
 package com.example.demo;
 
+import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.Clip;
-import javax.sound.sampled.FloatControl;
+import javax.sound.sampled.SourceDataLine;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * What the game sounds like: a cue under each screen, and the typewriter.
@@ -23,16 +26,22 @@ import java.util.concurrent.atomic.AtomicLong;
  * a player who wants silence has to get it in one press and keep it next time,
  * so the two settings live in a file beside the save.
  *
- * The sound comes from the JDK's own mixer rather than JavaFX's. JavaFX can
- * either loop a clip without a seam or change its volume, never both: an
- * AudioClip's volume is fixed once it sounds, and a MediaPlayer leaves a hole
- * at the loop. A javax.sound Clip loops a buffer gaplessly and has a gain
- * control that moves while it plays, which is what one cue turning into
- * another is made of.
+ * The sound is mixed here rather than handed to a player. Nothing on the shelf
+ * does the two things this needs at once. JavaFX will loop a clip without a
+ * seam but freezes its volume the moment it sounds; its MediaPlayer leaves a
+ * hole at the loop. The JDK's own Clip loops properly and has a volume control,
+ * but that control moves in steps of five eighths of a decibel and sits behind
+ * a one second buffer, so a fade through it arrives as three or four jumps -
+ * which is what a player hears as the music catching.
  *
- * Nothing here is allowed to stop the game. A missing codec, a machine with no
- * audio device, a file that will not decode: each is caught and the game plays
- * on in silence.
+ * So the cues are read into memory as plain numbers and written to one output
+ * line a few hundred samples at a time, every sample multiplied by a level of
+ * its own. A fade is then exactly a hand on a fader: no steps, no lag, and a
+ * loop that comes round without a gap because the reading simply starts over.
+ *
+ * Nothing here is allowed to stop the game. A missing file, a machine with no
+ * audio device, a format the mixer will not take: each is caught and the game
+ * plays on in silence.
  */
 public final class Sound {
 
@@ -51,88 +60,97 @@ public final class Sound {
         GAME("/com/example/demo/audio/music-loop.wav", 0.38, true);
 
         final String resource;
-        private final double volume;
+        private final double level;
         private final boolean loops;
 
-        Track(String resource, double volume, boolean loops) {
+        Track(String resource, double level, boolean loops) {
             this.resource = resource;
-            this.volume = volume;
+            this.level = level;
             this.loops = loops;
         }
     }
 
     private static final String TYPING = "/com/example/demo/audio/typing-loop.wav";
-    private static final double TYPING_VOLUME = 0.30;
+    private static final double TYPING_LEVEL = 0.30;
 
-    /** How long one cue takes to become another. */
-    private static final int FADE_MS = 900;
-    private static final int STEP_MS = 12;
+    private static final int RATE = 44100;
 
-    /** Quiet enough to be gone, loud enough that the mixer does not round it away. */
-    private static final float SILENT_DB = -60f;
+    /** Frames written at a time: short enough to answer quickly, long enough to be safe. */
+    private static final int BLOCK = 512;
 
-    private static final AtomicLong TOKENS = new AtomicLong();
+    private static final AudioFormat FORMAT = new AudioFormat(RATE, 16, 2, true, false);
+
+    /** How long one cue takes to become another, and how fast the typewriter arrives. */
+    private static final double FADE_SECONDS = 0.9;
+    private static final double TYPING_FADE_SECONDS = 0.05;
 
     private static final Sound INSTANCE = new Sound();
 
-    /** One loaded sound: the buffer, the knob that moves its level, and where it sits. */
-    private static final class Cue {
+    /**
+     * One cue in the mixer: the sound itself, where the reading is, and how far
+     * up its fader stands.
+     *
+     * The fader is held as a quarter turn rather than as a level, so a pair of
+     * cues handing over - one on the way up, one on the way down - keeps a
+     * steady power between them instead of dipping in the middle.
+     */
+    private static final class Voice {
 
-        private final Clip clip;
-        private final FloatControl gain;
-        private final float levelDb;
+        private final short[] pcm;
+        private final int channels;
+        private final int frames;
+        private final boolean loops;
         private final double level;
 
-        /** The only fade allowed to touch this cue; a newer one takes over. */
-        private volatile long fade;
+        private int at;
+        private double turn;            // 0 silent .. 1 full
+        private double per;             // how much of the turn one sample moves
+        private int going;              // +1 coming up, -1 going down, 0 holding
+        private boolean sounding;
 
-        Cue(Clip clip, FloatControl gain, float levelDb) {
-            this.clip = clip;
-            this.gain = gain;
-            this.levelDb = levelDb;
-            this.level = Math.pow(10, levelDb / 20.0);
+        Voice(short[] pcm, int channels, boolean loops, double level) {
+            this.pcm = pcm;
+            this.channels = channels;
+            this.frames = pcm.length / channels;
+            this.loops = loops;
+            this.level = level;
         }
 
-        void setDb(float db) {
-            if (gain != null) {
-                gain.setValue(Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), db)));
+        double gain() {
+            return level * Math.sin(turn * Math.PI / 2);
+        }
+
+        void rise(double seconds) {
+
+            per = 1.0 / (seconds * RATE);
+            going = 1;
+
+            if (!sounding) {
+                at = 0;
+                turn = 0;
+                sounding = true;
             }
         }
 
-        float db() {
-            return gain == null ? levelDb : gain.getValue();
-        }
-
-        /** The level as the ear takes it: 0 is gone, `level` is where the cue sits. */
-        void setAmplitude(double amp) {
-            setDb(amp <= 0.0001 ? SILENT_DB : (float) (20 * Math.log10(amp)));
-        }
-
-        double amplitude() {
-            return Math.pow(10, db() / 20.0);
-        }
-
-        void from(boolean loops) {
-            clip.setFramePosition(0);
-
-            if (loops) {
-                clip.loop(Clip.LOOP_CONTINUOUSLY);
-            } else {
-                clip.start();
-            }
+        void fall(double seconds) {
+            per = 1.0 / (seconds * RATE);
+            going = -1;
         }
     }
 
     private final Path settings = AppDirs.data().resolve("sound.properties");
 
-    private volatile Map<Track, Cue> cues = Map.of();
-    private volatile Cue typing;
+    private final Map<Track, Voice> cues = new EnumMap<>(Track.class);
+    private final List<Voice> voices = new ArrayList<>();
+
+    private Voice typing;
 
     private volatile Track current = Track.LOGO;
 
     private volatile boolean musicOn = true;
     private volatile boolean effectsOn = true;
 
+    private volatile boolean ready = false;
     private boolean started = false;
 
     private Sound() {
@@ -152,11 +170,11 @@ public final class Sound {
     }
 
     /**
-     * Reads the sounds in and starts the opening cue. Safe to call twice.
+     * Reads the cues in and opens the output. Safe to call twice.
      *
-     * It all happens on a thread of its own: decoding a track takes long enough
-     * that doing it on the UI thread stutters whatever is on screen, and the
-     * typewriter was skipping lines because of it.
+     * All of it happens on a thread of its own: reading a few megabytes of
+     * sound on the UI thread stutters whatever is on screen, and the typewriter
+     * was skipping lines because of it.
      */
     public void start() {
 
@@ -166,42 +184,134 @@ public final class Sound {
 
         started = true;
 
-        Thread loader = new Thread(this::load, "sound-load");
-        loader.setDaemon(true);
-        loader.start();
+        Thread mixer = new Thread(this::run, "sound-mixer");
+        mixer.setDaemon(true);
+        mixer.start();
     }
 
-    private void load() {
+    private void run() {
 
-        EnumMap<Track, Cue> loaded = new EnumMap<>(Track.class);
+        synchronized (this) {
 
-        for (Track track : Track.values()) {
-            Cue cue = open(track.resource, track.volume);
+            for (Track track : Track.values()) {
+                Voice voice = open(track.resource, track.loops, track.level);
 
-            if (cue != null) {
-                loaded.put(track, cue);
+                if (voice != null) {
+                    cues.put(track, voice);
+                    voices.add(voice);
+                }
+            }
+
+            typing = open(TYPING, true, TYPING_LEVEL);
+
+            if (typing != null) {
+                voices.add(typing);
+            }
+
+            ready = !cues.isEmpty();
+
+            Voice first = cues.get(current);
+
+            if (musicOn && first != null) {
+                first.rise(FADE_SECONDS);
             }
         }
 
-        Cue keys = open(TYPING, TYPING_VOLUME);
+        try (SourceDataLine line = AudioSystem.getSourceDataLine(FORMAT)) {
 
-        synchronized (this) {
-            cues = loaded;
-            typing = keys;
+            line.open(FORMAT, BLOCK * 4 * 4);
+            line.start();
 
-            Cue now = loaded.get(current);
+            pump(line);
 
-            if (musicOn && now != null) {
-                rise(now, current.loops);
+        } catch (Exception noSound) {
+            System.err.println("sound: " + noSound.getMessage());
+        }
+    }
+
+    /** Writes sound for as long as the game runs - silence when nothing is up. */
+    private void pump(SourceDataLine line) {
+
+        float[] mix = new float[BLOCK * 2];
+        byte[] out = new byte[BLOCK * 4];
+
+        while (true) {
+
+            Arrays.fill(mix, 0f);
+
+            synchronized (this) {
+                for (Voice voice : voices) {
+                    if (voice.sounding) {
+                        render(voice, mix);
+                    }
+                }
             }
+
+            for (int i = 0; i < mix.length; i++) {
+                int s = Math.round(Math.max(-1f, Math.min(1f, mix[i])) * 32767);
+                out[i * 2] = (byte) (s & 0xFF);
+                out[i * 2 + 1] = (byte) ((s >> 8) & 0xFF);
+            }
+
+            line.write(out, 0, out.length);
+        }
+    }
+
+    /**
+     * One cue's share of the next block.
+     *
+     * The fader moves across the block rather than at its edge: the level is
+     * worked out at both ends and every sample in between gets its own, which
+     * is what makes a fade a slope instead of a staircase.
+     */
+    private void render(Voice voice, float[] mix) {
+
+        double from = voice.gain();
+
+        if (voice.going != 0) {
+            voice.turn = Math.max(0, Math.min(1, voice.turn + voice.going * voice.per * BLOCK));
+
+            if (voice.turn <= 0 || voice.turn >= 1) {
+                voice.going = 0;
+            }
+        }
+
+        double to = voice.gain();
+
+        for (int i = 0; i < BLOCK; i++) {
+
+            double gain = from + (to - from) * i / BLOCK;
+            int frame = voice.at * voice.channels;
+
+            float left = voice.pcm[frame] / 32768f;
+            float right = voice.channels > 1 ? voice.pcm[frame + 1] / 32768f : left;
+
+            mix[i * 2] += (float) (left * gain);
+            mix[i * 2 + 1] += (float) (right * gain);
+
+            voice.at++;
+
+            if (voice.at >= voice.frames) {
+
+                if (!voice.loops) {
+                    voice.sounding = false;
+                    return;
+                }
+
+                voice.at = 0;       // round again, with nothing in between
+            }
+        }
+
+        if (voice.turn <= 0 && voice.going == 0) {
+            voice.sounding = false;
         }
     }
 
     /**
      * Puts on the cue that belongs to the screen the player is looking at.
      *
-     * The two overlap while one gives way to the other, so a switch is a change
-     * of room rather than a cut.
+     * The two cross over: one comes up as the other goes down, so a switch is a
+     * change of room rather than a cut.
      */
     public synchronized void play(Track track) {
 
@@ -216,15 +326,15 @@ public final class Sound {
             return;         // remembered; it starts if the music is switched on
         }
 
-        Cue arriving = cues.get(track);
-        Cue going = cues.get(leaving);
+        Voice arriving = cues.get(track);
+        Voice going = cues.get(leaving);
 
         if (arriving != null) {
-            rise(arriving, track.loops);
+            arriving.rise(FADE_SECONDS);
         }
 
         if (going != null) {
-            fade(going, going.amplitude(), 0, true);
+            going.fall(FADE_SECONDS);
         }
     }
 
@@ -233,16 +343,15 @@ public final class Sound {
         musicOn = on;
         write();
 
-        Cue now = cues.get(current);
-
-        if (now == null) {
-            return;         // still loading; load() will see the new setting
-        }
-
         if (on) {
-            rise(now, current.loops);
+            Voice now = cues.get(current);
+
+            if (now != null) {
+                now.rise(FADE_SECONDS);
+            }
+
         } else {
-            cues.values().forEach(cue -> fade(cue, cue.amplitude(), 0, true));
+            cues.values().forEach(voice -> voice.fall(0.35));
         }
     }
 
@@ -257,25 +366,17 @@ public final class Sound {
     }
 
     /** The typewriter, for as long as a line is being typed. */
-    public void typingStarted() {
+    public synchronized void typingStarted() {
 
-        Cue keys = typing;
-
-        if (keys == null || !effectsOn) {
-            return;
-        }
-
-        if (!keys.clip.isRunning()) {
-            keys.from(true);
+        if (typing != null && effectsOn) {
+            typing.rise(TYPING_FADE_SECONDS);
         }
     }
 
-    public void typingStopped() {
+    public synchronized void typingStopped() {
 
-        Cue keys = typing;
-
-        if (keys != null && keys.clip.isRunning()) {
-            keys.clip.stop();
+        if (typing != null) {
+            typing.fall(TYPING_FADE_SECONDS);
         }
     }
 
@@ -283,86 +384,26 @@ public final class Sound {
     // WHAT THE MIXER IS DOING - read back by the fade's test
     // =========================================================
 
-    /** True once the files are in the mixer; false on a machine with no audio. */
+    /** True once the cues are in memory; false on a machine with no audio. */
     boolean ready() {
-        return !cues.isEmpty();
+        return ready;
     }
 
-    /** The level this cue is at right now, in dB. */
-    float levelOf(Track track) {
-        Cue cue = cues.get(track);
-        return cue == null ? SILENT_DB : cue.db();
-    }
+    /** The level this cue stands at, in dB, as the mixer has it this instant. */
+    synchronized float levelOf(Track track) {
 
-    boolean sounding(Track track) {
-        Cue cue = cues.get(track);
-        return cue != null && cue.clip.isRunning();
-    }
+        Voice voice = cues.get(track);
 
-    // =========================================================
-    // ONE CUE BECOMING ANOTHER
-    // =========================================================
-
-    /** Starts a cue from silence and brings it up to its own level. */
-    private void rise(Cue cue, boolean loops) {
-
-        double from = cue.clip.isRunning() ? cue.amplitude() : 0;
-
-        if (!cue.clip.isRunning()) {
-            cue.setDb(SILENT_DB);
-            cue.from(loops);
+        if (voice == null || !voice.sounding || voice.gain() <= 0.0001) {
+            return -60f;
         }
 
-        fade(cue, from, cue.level, false);
+        return (float) (20 * Math.log10(voice.gain()));
     }
 
-    /**
-     * Moves a cue's level, in what the ear hears rather than in decibels.
-     *
-     * A straight line in decibels is not a fade: halfway through a ramp from
-     * silence to -8 dB the sound is at -34 dB, which is two per cent of it, so
-     * both cues sat in a hole in the middle of every switch and the music
-     * seemed to stumble. The ramp is on the amplitude now, around a quarter
-     * turn of a circle - the one leaving on the cosine, the one arriving on
-     * the sine - which is the shape that keeps the pair's power steady as one
-     * hands over to the other.
-     */
-    private void fade(Cue cue, double fromAmp, double toAmp, boolean stopAtEnd) {
-
-        long token = TOKENS.incrementAndGet();
-        cue.fade = token;
-
-        Thread fader = new Thread(() -> {
-
-            int steps = FADE_MS / STEP_MS;
-
-            for (int i = 0; i <= steps; i++) {
-
-                if (cue.fade != token) {
-                    return;         // a newer fade owns this cue now
-                }
-
-                double turn = (Math.PI / 2) * i / steps;
-                double amp = fromAmp * Math.cos(turn) + toAmp * Math.sin(turn);
-
-                cue.setAmplitude(amp);
-
-                try {
-                    Thread.sleep(STEP_MS);
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-            }
-
-            if (stopAtEnd && cue.fade == token) {
-                cue.clip.stop();
-            }
-
-        }, "sound-fade");
-
-        fader.setDaemon(true);
-        fader.start();
+    synchronized boolean sounding(Track track) {
+        Voice voice = cues.get(track);
+        return voice != null && voice.sounding;
     }
 
     // =========================================================
@@ -370,14 +411,13 @@ public final class Sound {
     // =========================================================
 
     /**
-     * One WAV read into the mixer.
+     * One WAV read into memory as numbers.
      *
-     * The whole file is held as sound rather than streamed: a Clip loops its
-     * buffer without a seam, which is the point of it, and the largest of these
-     * is a few megabytes. Compressed formats are not read here - the JDK mixer
-     * takes PCM - so every cue ships as a WAV.
+     * The whole file is held rather than streamed: the largest is a few
+     * megabytes, and a loop that has to come round without a gap cannot wait on
+     * a disk. Only PCM is read - every cue ships as a WAV for that reason.
      */
-    private static Cue open(String resource, double volume) {
+    private static Voice open(String resource, boolean loops, double level) {
 
         try (InputStream raw = Sound.class.getResourceAsStream(resource)) {
 
@@ -387,17 +427,30 @@ public final class Sound {
 
             try (AudioInputStream in = AudioSystem.getAudioInputStream(new BufferedInputStream(raw))) {
 
-                Clip clip = AudioSystem.getClip();
-                clip.open(in);
+                AudioFormat format = in.getFormat();
 
-                FloatControl gain = clip.isControlSupported(FloatControl.Type.MASTER_GAIN)
-                        ? (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN)
-                        : null;
+                if (format.getSampleSizeInBits() != 16 || (int) format.getSampleRate() != RATE) {
+                    System.err.println("sound: " + resource + " nem 16 bites 44.1 kHz");
+                    return null;
+                }
 
-                Cue cue = new Cue(clip, gain, (float) (20 * Math.log10(volume)));
-                cue.setDb(cue.levelDb);
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                byte[] chunk = new byte[16384];
 
-                return cue;
+                for (int n = in.read(chunk); n > 0; n = in.read(chunk)) {
+                    bytes.write(chunk, 0, n);
+                }
+
+                byte[] data = bytes.toByteArray();
+                short[] pcm = new short[data.length / 2];
+
+                for (int i = 0; i < pcm.length; i++) {
+                    pcm[i] = format.isBigEndian()
+                            ? (short) ((data[i * 2] << 8) | (data[i * 2 + 1] & 0xFF))
+                            : (short) ((data[i * 2 + 1] << 8) | (data[i * 2] & 0xFF));
+                }
+
+                return new Voice(pcm, format.getChannels(), loops, level);
             }
 
         } catch (Exception noSound) {
