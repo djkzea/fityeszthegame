@@ -263,6 +263,18 @@ public class HelloApplication extends Application {
         VBox items = new VBox(2, resume, pauseSave, log, pauseMusic, pauseSounds, menu, quit);
         items.setPadding(new Insets(18, 0, 0, 0));
 
+        // The order the keys walk is read off the sheet itself. It used to be the
+        // order the buttons were written in, and the two drifted apart the moment
+        // a line was added in the middle: going up from the bottom skipped the two
+        // switches, landed on the log, and jumped back down to them.
+        pauseNav.clear();
+
+        for (Node line : items.getChildren()) {
+            if (line instanceof Button button) {
+                pauseNav.add(button);
+            }
+        }
+
         VBox sheet = new VBox(heading, items);
         sheet.setPadding(new Insets(26, 30, 26, 26));
         sheet.setMaxSize(360, Region.USE_PREF_SIZE);
@@ -281,9 +293,9 @@ public class HelloApplication extends Application {
         in.play();
     }
 
-    /** "ZENE · BE" - the setting reads as part of the menu line. */
+    /** "ZENE · BE" - the setting reads as part of the menu line, in its voice. */
     private static String switchLabel(String key, boolean on) {
-        return Lang.t(key) + " · " + Lang.t(on ? "ui.on" : "ui.off").toUpperCase();
+        return (Lang.t(key) + " · " + Lang.t(on ? "ui.on" : "ui.off")).toUpperCase();
     }
 
     private Button pauseItem(String text, Runnable action) {
@@ -296,8 +308,6 @@ public class HelloApplication extends Application {
         b.setFocusTraversable(false);
         b.setOnAction(e -> action.run());
         b.setOnMouseEntered(e -> selectPause(pauseNav.indexOf(b)));
-
-        pauseNav.add(b);
         return b;
     }
 
