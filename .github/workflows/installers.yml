@@ -19,8 +19,22 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    # so a tagged build can hang its installer on the release
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
+
+      # A tag is what the version is: v1.1.0 has to produce installers that call
+      # themselves 1.1.0, or the file a player downloads argues with the page it
+      # came from. Both packaging scripts already read VERSION from here.
+      - name: Version from the tag
+        shell: bash
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV" ;;
+          esac
 
       - uses: actions/setup-java@v4
         with:
@@ -67,3 +81,16 @@ jobs:
           path: |
             target/installer/*
           if-no-files-found: error
+
+      # A build artifact needs a GitHub account to download and is thrown away
+      # after ninety days, so it is no use to a page that says "download the
+      # game". On a tag the installer goes onto the release instead, where the
+      # link is permanent and public. The release is made before the tag is
+      # pushed, so all three machines only ever upload to one that is already
+      # there.
+      - name: Hang it on the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" target/installer/* --clobber
