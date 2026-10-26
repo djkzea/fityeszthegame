@@ -17,8 +17,10 @@ jobs:
       matrix:
         # Two Macs, because jpackage builds for the chip it runs on and an arm64
         # bundle will not start on an Intel Mac at all - Rosetta translates the
-        # other way. macos-latest is Apple Silicon, macos-13 is the Intel one.
-        os: [macos-latest, macos-13, ubuntu-latest, windows-latest]
+        # other way. macos-latest is Apple Silicon, macos-15-intel is the Intel
+        # one - macos-13, the old Intel image, has been retired and a job asking
+        # for it now simply queues for ever.
+        os: [macos-latest, macos-15-intel, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
 
