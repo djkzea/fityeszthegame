@@ -2267,16 +2267,17 @@ public class GameUI {
                 return;
             }
 
+            // Typing into a text field: every key belongs to the field. This has to
+            // come before the shortcuts below, or the L of a name opens the log.
+            if (scene.getFocusOwner() instanceof javafx.scene.control.TextInputControl) {
+                return;
+            }
+
             if (code == KeyCode.L) {
                 if (onLog != null) {
                     onLog.run();
                 }
                 event.consume();
-                return;
-            }
-
-            // typing into a text field: leave Enter / Space / digits to the field
-            if (scene.getFocusOwner() instanceof javafx.scene.control.TextInputControl) {
                 return;
             }
 

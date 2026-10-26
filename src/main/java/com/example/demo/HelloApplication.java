@@ -91,6 +91,10 @@ public class HelloApplication extends Application {
         pauseLayer.setAlignment(Pos.CENTER);
         setPauseShown(false);
 
+        // whatever page is in the shell, it gets the window's size - it does not get
+        // to set a floor under it and keep the window from shrinking back
+        shell.setMinSize(0, 0);
+
         shell.getChildren().addAll(title().getRoot(), pauseLayer, curtain, card);
 
         scene = new Scene(shell, 1200, 800);

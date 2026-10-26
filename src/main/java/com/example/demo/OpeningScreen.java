@@ -149,6 +149,14 @@ public class OpeningScreen {
 
         root.setStyle("-fx-background-color: " + PAGE + ";");
 
+        // The page never asks the window to be bigger than it is. Half the art here
+        // is sized off this very node - the backdrop fills it, the lineup is a share
+        // of its height - and an ImageView is not resizable, so its fitted size comes
+        // straight back up as this pane's minimum. The scene then grows the root to
+        // that minimum, which raises it again: the window could only ever get larger,
+        // and coming out of full screen the page stayed at full-screen size.
+        root.setMinSize(0, 0);
+
         plate = buildPlate();
         cast = buildCast();
         column = buildColumn();
@@ -520,7 +528,12 @@ public class OpeningScreen {
         int at = root.getChildren().indexOf(old);
 
         column = buildColumn();
-        column.setOpacity(old.getOpacity());
+
+        // Not the old node's opacity: the reveal fades the column in on a delay, and
+        // a rebuild landing mid-fade (the runs arriving from the network, say) would
+        // copy the 0 it is still sitting at and leave the menu invisible for good.
+        // Once the poster is up the column belongs on screen, full stop.
+        column.setOpacity(splashDone ? 1 : old.getOpacity());
         StackPane.setAlignment(column, Pos.CENTER_LEFT);
 
         root.getChildren().set(at, column);
@@ -576,16 +589,17 @@ public class OpeningScreen {
 
         Button exit = menuButton(Lang.t("ui.exit"), true, onExit);
 
+        // Playing comes first and the account line sits down by the exit. It used to
+        // head the list, which made signing out the thing a leant-on Enter did.
         menu.getChildren().addAll(
-                menuRow(signIn, who == null ? null : Lang.t("ui.signOut").toUpperCase()),
                 menuRow(newGame, null),
                 menuRow(loadGame, runs.isEmpty()
                         ? Lang.t("ui.noSave").toUpperCase()
                         : (runs.size() + " " + Lang.t("ui.saves")).toUpperCase()),
                 menuRow(crewButton, "fityeszthegame.com".toUpperCase()),
+                menuRow(signIn, who == null ? null : Lang.t("ui.signOut").toUpperCase()),
                 menuRow(exit, null));
 
-        nav.add(signIn);
         nav.add(newGame);
 
         if (!runs.isEmpty()) {
@@ -593,6 +607,7 @@ public class OpeningScreen {
         }
 
         nav.add(crewButton);
+        nav.add(signIn);
         nav.add(exit);
     }
 
