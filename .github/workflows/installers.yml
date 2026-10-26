@@ -15,7 +15,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        # Two Macs, because jpackage builds for the chip it runs on and an arm64
+        # bundle will not start on an Intel Mac at all - Rosetta translates the
+        # other way. macos-latest is Apple Silicon, macos-13 is the Intel one.
+        os: [macos-latest, macos-13, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -75,9 +78,21 @@ jobs:
         shell: cmd
         run: packaging\package.bat
 
+      # ... which means two files called the same thing, and the second upload
+      # would quietly stand on the first. The chip goes in the name.
+      - name: Say which chip the Mac build is for
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          chip=$(uname -m)
+          for dmg in target/installer/*.dmg; do
+            mv "$dmg" "${dmg%.dmg}-$chip.dmg"
+          done
+          ls -l target/installer
+
       - uses: actions/upload-artifact@v4
         with:
-          name: fityesz-kronika-${{ runner.os }}
+          name: fityesz-kronika-${{ runner.os }}-${{ runner.arch }}
           path: |
             target/installer/*
           if-no-files-found: error
