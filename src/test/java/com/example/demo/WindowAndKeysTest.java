@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -199,6 +200,52 @@ class WindowAndKeysTest {
         throw new AssertionError("nincs nyelvvalto a hasabban");
     }
 
+    /**
+     * The story is read with Enter, and the Enters still in the buffer when a run
+     * is left are delivered to the title page in one breath. Three of them used to
+     * walk through NEW GAME, slot one, and the "write over it?" that follows - a
+     * saved run gone to a key nobody meant for this page.
+     */
+    @Test
+    void aheldEnterDoesNotWalkIntoSomebodysSave() throws Exception {
+
+        toolkit();
+
+        Path dir = Files.createTempDirectory("fityesz-saves");
+        SaveStore store = new SaveStore(dir);
+
+        store.saveLocal(1, new SaveData("Zsombi", "Zsombi", 2, "chapter2",
+                90, 20, 1, List.of(), List.of(), List.of(), null, null,
+                "2026-10-20T10:00:00Z"));
+
+        List<Integer> started = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+
+        StackPane root = onFxThread(() -> {
+
+            OpeningScreen title = new OpeningScreen(
+                    started::add, () -> { }, () -> { }, run -> { }, null, store);
+
+            Stage stage = new Stage();
+            stage.setScene(new Scene(title.getRoot(), 1200, 800));
+            stage.show();
+            title.showPosterNow();
+            return title.getRoot();
+        });
+
+        // a held key repeats about every 33ms
+        for (int i = 0; i < 12; i++) {
+            onFxThread(() -> {
+                Event.fireEvent(root, new KeyEvent(KeyEvent.KEY_PRESSED, "\r", "\r",
+                        KeyCode.ENTER, false, false, false, false));
+                return null;
+            });
+            Thread.sleep(33);
+        }
+
+        assertTrue(started.isEmpty(), "a leragadt Enter elinditott egy futast: " + started);
+        assertTrue(store.loadLocal(1).isPresent(), "a mentett futas eltunt");
+    }
+
     @Test
     void thePageComesBackDownWithTheWindow() throws Exception {
 
@@ -212,16 +259,41 @@ class WindowAndKeysTest {
                     slot -> { }, () -> { }, () -> { }, run -> { },
                     controller.account(), controller.saves());
 
-            // the shell the app puts its pages in - it takes the window's size, and
-            // what is measured here is whether the page follows it back down
-            StackPane box = new StackPane(title.getRoot());
-            box.setMinSize(0, 0);
-
-            Stage stage = new Stage();
-            stage.setScene(new Scene(box, 1200, 800));
-            stage.show();
-            return title.getRoot();
+            return show(title.getRoot());
         });
+
+        assertComesBack(page);
+    }
+
+    /** The sign-in page scales its form off its own root, the same way. */
+    @Test
+    void theSignInPageComesBackDownToo() throws Exception {
+
+        toolkit();
+
+        StackPane page = onFxThread(() -> {
+            GameController controller = new GameController(new Stage());
+            return show(new LoginScreen(controller.account(), () -> { }, () -> { }).getRoot());
+        });
+
+        assertComesBack(page);
+    }
+
+    /** Puts a page in the shell the app uses, in a 1200x800 window. */
+    private static StackPane show(StackPane page) {
+
+        // the shell takes the window's size; what is measured is whether the page
+        // inside it follows the window back down
+        StackPane box = new StackPane(page);
+        box.setMinSize(0, 0);
+
+        Stage stage = new Stage();
+        stage.setScene(new Scene(box, 1200, 800));
+        stage.show();
+        return page;
+    }
+
+    private static void assertComesBack(StackPane page) throws Exception {
 
         onFxThread(() -> {
             page.getScene().getWindow().setWidth(1710);

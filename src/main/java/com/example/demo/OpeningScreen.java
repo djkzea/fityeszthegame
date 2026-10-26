@@ -104,6 +104,10 @@ public class OpeningScreen {
     private boolean splashDone = false;
     private boolean starting = false;
 
+    /** When the page last changed under the player's hand, and when it last acted. */
+    private long shownAt = System.nanoTime();
+    private long lastTake = 0;
+
     private final String headFont;
     private final String labelFont;
 
@@ -205,6 +209,7 @@ public class OpeningScreen {
     public void showPosterNow() {
 
         splashDone = true;
+        shownAt = System.nanoTime();
         Sound.get().play(Sound.Track.MENU);
         splash.setVisible(false);
         splash.setOpacity(0);
@@ -317,9 +322,11 @@ public class OpeningScreen {
             buildSlots(menu);
         }
 
-        Label hint = new Label(spaced(Lang.magyar()
-                ? "↑↓ VÁLASSZ · ENTER INDÍT · ESC KILÉP"
-                : "↑↓ SELECT · ENTER START · ESC QUIT"));
+        Label hint = new Label(spaced(mode == Mode.MENU
+                ? (Lang.magyar() ? "↑↓ VÁLASSZ · ENTER INDÍT · ESC KILÉP"
+                                 : "↑↓ SELECT · ENTER START · ESC QUIT")
+                : (Lang.magyar() ? "↑↓ VÁLASSZ · ENTER INDÍT · ESC VISSZA"
+                                 : "↑↓ SELECT · ENTER START · ESC BACK")));
         hint.setFont(Font.font(labelFont, 9));
         hint.setStyle("-fx-text-fill: " + GRAY + ";");
 
@@ -523,6 +530,7 @@ public class OpeningScreen {
 
         nav.clear();
         selected = null;
+        shownAt = System.nanoTime();     // the page changed; leftover presses are not answers
 
         Node old = column;
         int at = root.getChildren().indexOf(old);
@@ -675,13 +683,7 @@ public class OpeningScreen {
             menu.getChildren().add(hint);
         }
 
-        Button back = menuButton(Lang.t("ui.back"), true, () -> {
-            mode = Mode.MENU;
-            confirming = 0;
-            deleting = 0;
-            deleteFailed = 0;
-            rebuild();
-        });
+        Button back = menuButton(Lang.t("ui.back"), true, this::toMenu);
 
         menu.getChildren().add(menuRow(back, null));
         nav.add(back);
@@ -854,6 +856,32 @@ public class OpeningScreen {
     // KEYS
     // ==========================================
 
+    /**
+     * A press that cannot be a reader's decision - the same guard the game screen
+     * keeps, because the same two things happen here.
+     *
+     * Pressed together: the story is read with Enter, and the Enters still in the
+     * buffer when the player leaves a run are delivered to this page in one go. A
+     * held key repeats about every 33ms. Three of those used to walk straight
+     * through NEW GAME, slot one, and the "write over it?" that follows - which is
+     * someone's run gone, with nobody having read a word of it.
+     *
+     * Pressed at the wrong screen: the key that closed the pause sheet is still on
+     * its way when this page comes up, so the window runs from the page appearing
+     * rather than from the press before it.
+     */
+    private boolean leftoverPress() {
+
+        long now = System.nanoTime();
+
+        if (now - shownAt < 350_000_000L || now - lastTake < 150_000_000L) {
+            return true;
+        }
+
+        lastTake = now;
+        return false;
+    }
+
     private void onKey(KeyEvent e) {
 
         // any key gets past the splash, and past the card if it was called up
@@ -873,24 +901,42 @@ public class OpeningScreen {
                 e.consume();
             }
             case ENTER, SPACE -> {
-                if (selected != null) {
+                if (selected != null && !leftoverPress()) {
                     selected.fire();
                 }
                 e.consume();
             }
             case DELETE, BACK_SPACE -> {
                 if (mode == Mode.LOAD && selected != null
-                        && selected.getProperties().get("slot") instanceof Integer slot) {
+                        && selected.getProperties().get("slot") instanceof Integer slot
+                        && !leftoverPress()) {
                     askDelete(slot);
                 }
                 e.consume();
             }
             case ESCAPE -> {
-                onExit.run();
+                if (!leftoverPress()) {
+                    // out of the slot list, Escape is the way back to the menu; it is
+                    // only the way out of the game from the menu itself
+                    if (mode == Mode.MENU) {
+                        onExit.run();
+                    } else {
+                        toMenu();
+                    }
+                }
                 e.consume();
             }
             default -> { }
         }
+    }
+
+    /** Back out of the slot list, forgetting anything it was half-way through asking. */
+    private void toMenu() {
+        mode = Mode.MENU;
+        confirming = 0;
+        deleting = 0;
+        deleteFailed = 0;
+        rebuild();
     }
 
     private void move(int step) {
@@ -1268,6 +1314,7 @@ public class OpeningScreen {
             return;
         }
         splashDone = true;
+        shownAt = System.nanoTime();
 
         // the wordmark's sting has had its moment; the menu has its own cue
         Sound.get().play(Sound.Track.MENU);
