@@ -38,6 +38,7 @@ build/
 .DS_Store
 ### Supabase keys, generated from the website project
 src/main/resources/com/example/demo/supabase.properties
+src/main/resources/com/example/demo/version.properties
 
 ### Playwright MCP screenshots
 .playwright-mcp/

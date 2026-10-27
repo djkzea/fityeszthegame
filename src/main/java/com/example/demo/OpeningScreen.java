@@ -331,13 +331,17 @@ public class OpeningScreen {
         hint.setStyle("-fx-text-fill: " + GRAY + ";");
 
         Node languages = languageToggle();
+        languages.setId("languages");       // so a test can find it by name, not by position
+
+        Label update = updateLine();
 
         VBox.setMargin(tagline, new Insets(16, 0, 0, 3));
         VBox.setMargin(menu, new Insets(38, 0, 0, 0));
         VBox.setMargin(hint, new Insets(24, 0, 0, 3));
+        VBox.setMargin(update, new Insets(10, 0, 0, 3));
         VBox.setMargin(languages, new Insets(14, 0, 0, 3));
 
-        col.getChildren().addAll(logo, tagline, menu, hint, languages);
+        col.getChildren().addAll(logo, tagline, menu, hint, update, languages);
 
         // Scaled as one block so the type keeps its proportions in any window.
         // The pivot is pinned to the left edge (and the vertical middle) because
@@ -511,6 +515,44 @@ public class OpeningScreen {
         }
 
         return l;
+    }
+
+    /**
+     * A line that is not there until there is something to say.
+     *
+     * The check is asked once a run and answers on a thread of its own; if it
+     * has nothing, or cannot reach anything, this stays invisible and takes up
+     * no room. Clicking it opens the page the installers are on.
+     */
+    private Label updateLine() {
+
+        Label line = new Label();
+        line.setFont(Font.font(labelFont, 9));
+        line.setStyle("-fx-text-fill: " + RED_TEXT + "; -fx-cursor: hand;");
+        line.setVisible(false);
+        line.setManaged(false);
+
+        line.setOnMouseClicked(e -> open(Updates.PAGE));
+
+        Updates.check(new HttpTransport(), version ->
+                javafx.application.Platform.runLater(() -> {
+                    line.setText(spaced((Lang.t("ui.newVersion") + " " + version
+                            + " · " + Lang.t("ui.download")).toUpperCase()));
+                    line.setVisible(true);
+                    line.setManaged(true);
+                }));
+
+        return line;
+    }
+
+    /** Hands a link to whatever the machine opens links with. */
+    private static void open(String url) {
+
+        try {
+            java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
+        } catch (Exception noBrowser) {
+            System.err.println("link: " + noBrowser.getMessage());
+        }
     }
 
     /** Swaps the language and rebuilds the column, so the wordmark and the menu follow it. */

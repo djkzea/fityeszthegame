@@ -24,6 +24,10 @@ VENDOR="fityeszthegame.com"
 
 MVN=./mvnw
 
+# The game has to know its own number to be able to say a newer one exists.
+# The tag is the only place that number lives, and it reaches here as VERSION.
+printf 'version=%s\n' "$VERSION" > src/main/resources/com/example/demo/version.properties
+
 echo "==> building the jar"
 $MVN -q clean package -DskipTests
 

@@ -16,6 +16,12 @@ set NAME=Fityesz Kronika
 if "%VERSION%"=="" set VERSION=1.0.0
 if "%TYPE%"=="" set TYPE=msi
 
+rem The game has to know its own number to be able to say a newer one exists.
+rem In brackets on purpose: a digit straight before > is a redirection handle
+rem to cmd, so "echo version=1.0.0> file" would write "version=1.0." and send
+rem the rest somewhere else entirely.
+(echo version=%VERSION%)> src\main\resources\com\example\demo\version.properties
+
 echo ==^> building the jar
 call mvnw.cmd -q clean package -DskipTests || exit /b 1
 

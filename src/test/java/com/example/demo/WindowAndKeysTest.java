@@ -186,7 +186,12 @@ class WindowAndKeysTest {
     /** Clicks whichever language label is the inactive one. */
     private static void clickLanguage(Node column) {
 
-        for (Node n : column.lookupAll(".label")) {
+        // By name rather than "the first label that answers a click": the column
+        // grew another clickable line (the update notice) and this quietly
+        // started clicking that instead, which looked like a broken fade.
+        Node row = column.lookup("#languages");
+
+        for (Node n : (row == null ? column : row).lookupAll(".label")) {
             if (n.getOnMouseClicked() != null) {
                 n.getOnMouseClicked().handle(new javafx.scene.input.MouseEvent(
                         javafx.scene.input.MouseEvent.MOUSE_CLICKED,

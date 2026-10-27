@@ -142,6 +142,8 @@ public final class Lang {
         p("ui.chooseSlot",       "Hova kerüljön az új futás?", "Where should the new run go?");
         p("ui.whichRun",         "Melyiket folytatod?", "Which run do you continue?");
         p("ui.overwriteAsk",     "Felülírod? Nyomd meg újra", "Overwrite? Press again");
+        p("ui.newVersion",       "Új verzió", "New version");
+        p("ui.download",         "Letöltés", "Download");
         p("ui.delete",           "Törlés", "Delete");
         p("ui.deleteAsk",        "Törlöd? Nyomd meg újra", "Delete? Press again");
         p("ui.deleteFailed",     "Nem sikerült törölni", "Could not delete");
