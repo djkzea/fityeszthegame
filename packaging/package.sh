@@ -14,6 +14,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# The name and the vendor are also the game's identity to an installer: the
+# Windows upgrade code is derived from them, and the .deb is upgraded by its
+# package name, which is this one lowercased. Renaming either splits the
+# identity in two - InstallerUpgradeTest holds them still.
 NAME="Fityesz Kronika"
 VERSION="${VERSION:-1.0.0}"
 VENDOR="fityeszthegame.com"

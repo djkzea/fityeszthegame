@@ -8,6 +8,10 @@ setlocal
 
 cd /d "%~dp0.."
 
+rem The name and the vendor are what make the next installer an upgrade rather
+rem than a second copy: jpackage works the MSI's UpgradeCode out of those two
+rem alone. Change either and every machine that already has the game keeps it,
+rem and installs the new one beside it. InstallerUpgradeTest pins them.
 set NAME=Fityesz Kronika
 if "%VERSION%"=="" set VERSION=1.0.0
 if "%TYPE%"=="" set TYPE=msi
