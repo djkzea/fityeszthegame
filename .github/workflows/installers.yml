@@ -107,6 +107,27 @@ jobs:
           done
           ls -l target/installer
 
+      # The version comes out of jpackage in the file name, and the download
+      # page cannot use a name that changes: GitHub serves the newest release's
+      # file at /releases/latest/download/<name>, which only works while <name>
+      # stays the same. So the version is dropped here. It is not lost - the
+      # release says it, and so does the game once installed.
+      - name: Name the files what the site asks for
+        shell: bash
+        run: |
+          cd target/installer
+          for f in *; do
+            case "$f" in
+              *.msi)       new=Fityesz-Kronika-Windows.msi ;;
+              *arm64.dmg)  new=Fityesz-Kronika-macOS-AppleSilicon.dmg ;;
+              *x86_64.dmg) new=Fityesz-Kronika-macOS-Intel.dmg ;;
+              *.deb)       new=fityesz-kronika-linux-amd64.deb ;;
+              *) continue ;;
+            esac
+            [ "$f" = "$new" ] || mv "$f" "$new"
+          done
+          ls -l
+
       - uses: actions/upload-artifact@v4
         with:
           name: fityesz-kronika-${{ runner.os }}-${{ runner.arch }}
