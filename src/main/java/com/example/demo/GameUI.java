@@ -2822,13 +2822,14 @@ public class GameUI {
         );
 
         playerHp = Math.max(0, Math.min(100, playerHp));
-        bossHp = Math.max(0, Math.min(80, bossHp));
+        bossHp = Math.max(0, Math.min(GameState.BOSS_MAX_HP, bossHp));
 
         playerHpLabel.setText((hu ? "JÁTÉKOS ÉLETERŐ: " : "PLAYER HEALTH: ") + playerHp + " / 100");
-        bossHpLabel.setText((hu ? "ELLENFÉL ÉLETERŐ: " : "OPPONENT HEALTH: ") + bossHp + " / 80");
+        bossHpLabel.setText((hu ? "ELLENFÉL ÉLETERŐ: " : "OPPONENT HEALTH: ")
+                + bossHp + " / " + GameState.BOSS_MAX_HP);
 
         playerHpBar.set(playerHp / 100.0, true);
-        bossHpBar.set(bossHp / 80.0, true);
+        bossHpBar.set(bossHp / (double) GameState.BOSS_MAX_HP, true);
     }
 
     public void hideBossFight() {

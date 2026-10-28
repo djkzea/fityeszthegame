@@ -1087,6 +1087,35 @@ public class GameController {
         );
     }
 
+    // =========================================================
+    // WHAT A BOSS FIGHT COSTS
+    //
+    // The three fights were a race rather than a fight: an attack took the
+    // full twenty off whether the boss had covered up or not, so what the boss
+    // did never mattered and four presses of ATTACK ended any of them. A
+    // covered hit barely lands now, which makes reading the boss the whole
+    // game, and trading blows costs enough to make reading him worth it.
+    // =========================================================
+
+    /** The player's attack: into the open, and into a boss who covered up. */
+    private static final int HIT_OPEN = 20;
+    private static final int HIT_COVERED = 8;
+
+    /** What the player takes when both of them swing. */
+    private static final int TRADE = 16;
+
+    /** Lakatos reports a player who moves the same way three times running. */
+    private static final int REPORT = 30;
+
+    /** Peteri's scandal, for a player who will not attack. */
+    private static final int SCANDAL = 24;
+
+    /** Kapzs hits harder once he is cornered, and softer on someone he trusts. */
+    private static final int KAPZS_HIT = 16;
+    private static final int KAPZS_CORNERED = 26;
+    private static final int KAPZS_CORNERED_AT = 50;
+    private static final double KAPZS_TRUSTS_YOU = 0.7;
+
     private void bossMove(int playerMove) {
 
         // Count consecutive identical player moves.
@@ -1108,7 +1137,7 @@ public class GameController {
         if (sameMove >= 3) {
 
             state.setPlayerHp(
-                    state.getPlayerHp() - 30
+                    state.getPlayerHp() - REPORT
             );
 
             result = Lang.t("boss1.skill") + "\n\n"
@@ -1121,18 +1150,18 @@ public class GameController {
             if (bossMove == 1) {
                 // Both attack.
                 state.setPlayerHp(
-                        state.getPlayerHp() - 10
+                        state.getPlayerHp() - TRADE
                 );
 
                 state.setBossHp(
-                        state.getBossHp() - 20
+                        state.getBossHp() - HIT_OPEN
                 );
 
                 result = Lang.t("fight.bothAttacked");
             } else {
-                // Boss defends, player still deals damage.
+                // He covered up: the blow lands, and barely.
                 state.setBossHp(
-                        state.getBossHp() - 20
+                        state.getBossHp() - HIT_COVERED
                 );
 
                 result = Lang.t("boss1.hit");
@@ -1644,7 +1673,7 @@ public class GameController {
             peteriPassiveRounds = 0;
 
             state.setPlayerHp(
-                    state.getPlayerHp() - 20
+                    state.getPlayerHp() - SCANDAL
             );
 
             result = Lang.t("boss2.skill") + "\n\n"
@@ -1657,19 +1686,19 @@ public class GameController {
             if (bossMove == 1) {
                 // Both attack.
                 state.setPlayerHp(
-                        state.getPlayerHp() - 10
+                        state.getPlayerHp() - TRADE
                 );
 
                 state.setBossHp(
-                        state.getBossHp() - 20
+                        state.getBossHp() - HIT_OPEN
                 );
 
                 result = Lang.t("fight.bothAttacked");
 
             } else {
-                // Péteri defends, the player still deals damage.
+                // She covered up: the blow lands, and barely.
                 state.setBossHp(
-                        state.getBossHp() - 20
+                        state.getBossHp() - HIT_COVERED
                 );
 
                 result = Lang.t("boss2.struck");
@@ -2151,18 +2180,18 @@ public class GameController {
 
         if (playerMove == 1) {
 
-            state.setBossHp(state.getBossHp() - 20);
+            state.setBossHp(state.getBossHp() - (bossMove == 1 ? HIT_OPEN : HIT_COVERED));
 
             if (bossMove == 1) {
 
-                int damage = 10;
+                int damage = KAPZS_HIT;
 
-                if (state.getBossHp() < 50) {
-                    damage = 20;
+                if (state.getBossHp() < KAPZS_CORNERED_AT) {
+                    damage = KAPZS_CORNERED;
                 }
 
                 if (state.hasBossTrust()) {
-                    damage = (int) (damage * 0.7);
+                    damage = (int) (damage * KAPZS_TRUSTS_YOU);
                 }
 
                 state.setPlayerHp(

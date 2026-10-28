@@ -37,9 +37,17 @@ public class GameState {
     // BOSS FIGHT
     // ==========================================
 
+    /**
+     * What a boss starts with, and the most it can be put back to.
+     *
+     * The health bar reads this too: it used to carry its own 80, so raising
+     * the number here alone would have left the bar drawing a lie.
+     */
+    public static final int BOSS_MAX_HP = 110;
+
     private int playerHp = 100;
 
-    private int bossHp = 80;
+    private int bossHp = BOSS_MAX_HP;
 
 
     // ==========================================
@@ -253,9 +261,9 @@ public class GameState {
         }
 
 
-        if (bossHp > 80) {
+        if (bossHp > BOSS_MAX_HP) {
 
-            bossHp = 80;
+            bossHp = BOSS_MAX_HP;
         }
     }
 
@@ -268,6 +276,6 @@ public class GameState {
 
         playerHp = 100;
 
-        bossHp = 80;
+        bossHp = BOSS_MAX_HP;
     }
 }
